@@ -209,15 +209,25 @@ const runTranslationBatch = async ({ database, environment = process.env, fetchI
     JOIN address_pool address ON address.id=recovery.address_id
     WHERE recovery.status='failed' AND recovery.reason IN ('translation_or_publication_rejected','retry_limit')
       AND recovery.address_id>?${countryScope} ORDER BY recovery.address_id LIMIT ?`).bind(cacheProgress.cursor, ...countries, pendingLimit).all()).results;
-  const due = onlyCached ? [] : (await database.prepare(`SELECT recovery.address_id AS id,address.country_code FROM translation_recovery recovery
-    JOIN address_pool address ON address.id=recovery.address_id
-    WHERE ((recovery.status IN ('pending','waiting') AND (recovery.next_attempt_at IS NULL OR recovery.next_attempt_at<=?))
-      OR (recovery.status IN ('failed','rejected') AND recovery.service_revision<>
-        CASE WHEN recovery.status='rejected' AND recovery.reason='base_contract' THEN ?
-          WHEN recovery.status='failed' AND recovery.reason='translation_or_publication_rejected' THEN ? ELSE ? END))${countryScope}
-    ORDER BY CASE WHEN address.match_level='street' THEN 0 ELSE 1 END,address.active DESC,recovery.updated_at LIMIT ?`)
-    .bind(now().toISOString(), stateRevision(services.revision, 'rejected', 'base_contract'),
-      stateRevision(services.revision, 'failed', 'translation_or_publication_rejected'), services.revision, ...countries, scanLimit).all()).results;
+  // Bound each due branch through the recovery indexes before joining addresses; hundreds of thousands of
+  // deferred rows can be due at once, and sorting all of them exceeds the statement timeout.
+  const scopedRecovery = countries.length
+    ? ` AND address_id IN (SELECT id FROM address_pool address WHERE 1=1${countryScope})` : '';
+  const dueBranch = async (where, bindings, order) => (await database.prepare(`SELECT recovery.address_id AS id,
+      address.country_code,address.match_level,address.active,recovery.updated_at
+    FROM (SELECT address_id,updated_at FROM translation_recovery WHERE ${where}${scopedRecovery} ORDER BY ${order} LIMIT ?) recovery
+    JOIN address_pool address ON address.id=recovery.address_id`).bind(...bindings, ...countries, scanLimit).all()).results;
+  const due = onlyCached ? [] : [
+    ...await dueBranch(`status IN ('pending','waiting') AND (next_attempt_at IS NULL OR next_attempt_at<=?)`,
+      [now().toISOString()], 'next_attempt_at,address_id'),
+    ...await dueBranch(`status IN ('failed','rejected') AND service_revision<>
+        CASE WHEN status='rejected' AND reason='base_contract' THEN ?
+          WHEN status='failed' AND reason='translation_or_publication_rejected' THEN ? ELSE ? END`,
+      [stateRevision(services.revision, 'rejected', 'base_contract'),
+        stateRevision(services.revision, 'failed', 'translation_or_publication_rejected'), services.revision], 'address_id')
+  ].sort((left, right) => Number(left.match_level !== 'street') - Number(right.match_level !== 'street')
+    || Number(right.active) - Number(left.active) || String(left.updated_at).localeCompare(String(right.updated_at)))
+    .slice(0, scanLimit).map(({ id, country_code: countryCode }) => ({ id, country_code: countryCode }));
   const rows = (await database.prepare(`SELECT address.id,address.country_code,address.component_variants_json,address.native_language,
       address.active,address.retired_at,recovery.status AS recovery_status
     FROM address_pool address LEFT JOIN translation_recovery recovery ON recovery.address_id=address.id
