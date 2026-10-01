@@ -363,4 +363,10 @@ describe('strict residential generator page structure', () => {
     expect(adminSource).toContain('quotaLimit: unlimited ? UNLIMITED_QUOTA : Number(quotaLimit)');
     expect(adminSource).toContain('window.limit >= UNLIMITED_QUOTA');
   });
+
+  it('shows administrative coverage separately from the per-node minimum ratio', () => {
+    expect(adminSource).toContain('country.lowestCoverage.covered / country.lowestCoverage.total');
+    expect(adminSource).toContain('interpolate(ui.minimumNodes');
+    expect(adminSource).not.toContain('Math.round(country.coverageActual * 100)');
+  });
 });

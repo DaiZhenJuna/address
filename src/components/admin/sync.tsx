@@ -129,6 +129,15 @@ const stateLabel = (state: string, locale: AdminLocale): string => {
   if (state in extras) return extras[state as keyof typeof extras];
   return text.states[state] || state;
 };
+export const administrativeCoverage = (country: AddressDataCountry): number => country.lowestCoverage?.total
+  ? country.lowestCoverage.covered / country.lowestCoverage.total : country.coverageActual;
+const coverageDetail = (country: AddressDataCountry, locale: AdminLocale): string => {
+  const coverage = country.lowestCoverage;
+  if (!coverage?.total) return '';
+  const ui = localeText[locale].ui;
+  return [interpolate(ui.coverageNodes, { covered: coverage.covered.toLocaleString(locale), total: coverage.total.toLocaleString(locale) }),
+    interpolate(ui.minimumNodes, { count: coverage.qualified.toLocaleString(locale), min: country.minPerNode.toLocaleString(locale) })].join(' · ');
+};
 export const rulesFor = (country: AddressDataCountry, entry?: SyncQueueEntry): SyncQueueRules => {
   if (entry?.rules) return entry.rules;
   const administrativeCoverageMet = entry?.unmetRules
@@ -138,7 +147,7 @@ export const rulesFor = (country: AddressDataCountry, entry?: SyncQueueEntry): S
   return {
     total: { current: country.currentCount, target: country.targetCount, met: country.countMet },
     administrativeCoverage: {
-      actual: country.coverageActual, target: country.coverageRatio, met: administrativeCoverageMet,
+      actual: administrativeCoverage(country), target: country.coverageRatio, met: administrativeCoverageMet,
       covered: country.lowestCoverage?.covered || 0, total: country.lowestCoverage?.total || 0
     },
     regionalMinimums: {
@@ -230,7 +239,7 @@ export function CountryWorkspace({ initialData, locale, busy, mutate, request }:
     return !needle || country.countryCode.toLowerCase().includes(needle) || countryName(country.countryCode, locale).toLocaleLowerCase().includes(needle);
   }).sort((left, right) => {
     if (sort === 'name') return countryName(left.countryCode, locale).localeCompare(countryName(right.countryCode, locale), locale);
-    if (sort === 'coverage') return left.coverageActual - right.coverageActual || left.countryCode.localeCompare(right.countryCode);
+    if (sort === 'coverage') return administrativeCoverage(left) - administrativeCoverage(right) || left.countryCode.localeCompare(right.countryCode);
     return Number(left.countryCode !== 'CN') - Number(right.countryCode !== 'CN')
       || (queueStateRank[(entries.get(left.countryCode)?.state || 'done')] - queueStateRank[(entries.get(right.countryCode)?.state || 'done')])
       || right.deficit - left.deficit || left.countryCode.localeCompare(right.countryCode);
@@ -264,14 +273,14 @@ export function CountryWorkspace({ initialData, locale, busy, mutate, request }:
       const entry = entries.get(country.countryCode);
       const state = rowState(country, entry);
       const note = queueNote(entry, country, locale, data.queue?.job || null);
-      const coverage = country.lowestCoverage;
+      const coveragePercent = administrativeCoverage(country);
       const running = state === 'running';
       return <tr key={country.countryCode} className={`queue-row ${state}`} data-country={country.countryCode}>
         <td><button type="button" className="country-name-button" onClick={() => open(country.countryCode)}>{isCountryCode(country.countryCode) && <img className="country-flag" src={flagSrc(country.countryCode)} width="24" height="18" alt="" loading="lazy" />}<span className="country-cell-name"><strong>{countryName(country.countryCode, locale)}</strong><small className="country-code">{country.countryCode}</small></span></button></td>
         <td className="numeric-cell"><div className="count-progress"><strong>{country.currentCount.toLocaleString(locale)}<small> / {country.targetCount.toLocaleString(locale)}</small></strong><span className="progress-track" aria-hidden="true"><i style={{ width: `${usagePercent(country.currentCount, country.targetCount)}%` }} /></span></div></td>
-        <td><div className="coverage-cell" title={coverage ? `${coverage.qualified.toLocaleString(locale)} / ${coverage.total.toLocaleString(locale)} ${text.qualified}` : undefined}>
-          <div className="coverage-cell-head"><strong>{Math.round(country.coverageActual * 100)}%</strong><small>/ {Math.round(country.coverageRatio * 100)}%</small></div>
-          <span className="progress-track coverage-progress" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.round(country.coverageActual * 100))}%` }} /><b style={{ left: `calc(${Math.min(100, Math.round(country.coverageRatio * 100))}% - 1px)` }} /></span>
+        <td><div className="coverage-cell" title={coverageDetail(country, locale) || undefined}>
+          <div className="coverage-cell-head"><strong>{Math.round(coveragePercent * 100)}%</strong><small>/ {Math.round(country.coverageRatio * 100)}%</small></div>
+          <span className="progress-track coverage-progress" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.round(coveragePercent * 100))}%` }} /><b style={{ left: `calc(${Math.min(100, Math.round(country.coverageRatio * 100))}% - 1px)` }} /></span>
         </div></td>
         <td><RuleBadges rules={rulesFor(country, entry)} locale={locale} /></td>
         <td><div className="state-cell"><span className={`badge address-data-status ${stateBadgeClass(country, entry)}`}>{stateLabel(state, locale)}</span>{note && <small title={note}>{note}</small>}</div></td>
@@ -320,7 +329,7 @@ function CountryDetail({ country, entry, job, locale, busy, mutate, request, bac
     <div className="country-tab-panel" id="country-tab-panel" role="tabpanel" aria-labelledby={tabId(tab)}>
       {tab === 'overview' && <div className="detail-overview">
         <article className="detail-stat"><span>{text.current}</span><strong>{country.currentCount.toLocaleString(locale)}</strong><small>{text.target} {country.targetCount.toLocaleString(locale)}</small><span className="progress-track" aria-hidden="true"><i style={{ width: `${usagePercent(country.currentCount, country.targetCount)}%` }} /></span></article>
-        <article className="detail-stat"><span>{text.coverage}</span><strong>{Math.round(country.coverageActual * 100)}%</strong><small>{text.coverageGoal} {Math.round(country.coverageRatio * 100)}%{country.lowestCoverage ? ` · ${country.lowestCoverage.qualified.toLocaleString(locale)} / ${country.lowestCoverage.total.toLocaleString(locale)} ${text.qualified}` : ''}</small><span className="progress-track coverage-progress" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.round(country.coverageActual * 100))}%` }} /><b style={{ left: `calc(${Math.min(100, Math.round(country.coverageRatio * 100))}% - 1px)` }} /></span></article>
+        <article className="detail-stat"><span>{text.coverage}</span><strong>{Math.round(administrativeCoverage(country) * 100)}%</strong><small>{text.coverageGoal} {Math.round(country.coverageRatio * 100)}%{coverageDetail(country, locale) && ` · ${coverageDetail(country, locale)}`}</small><span className="progress-track coverage-progress" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.round(administrativeCoverage(country) * 100))}%` }} /><b style={{ left: `calc(${Math.min(100, Math.round(country.coverageRatio * 100))}% - 1px)` }} /></span></article>
         <article className="detail-stat"><span>{text.nextRun}</span><strong className="detail-stat-text">{nextRunLabel(entry?.nextAttemptAt ?? country.nextAttemptAt, locale)}</strong><small>{text.lastSuccess} {dateTime(country.lastSuccessfulAt, locale)}</small></article>
         <section className="detail-card detail-rules"><h3>{ui.rulesColumn}</h3>
           <dl>
