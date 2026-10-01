@@ -31,6 +31,17 @@ const policies = {
   RU: { admin1: true, locality: true }
 };
 
+// Geocoders return these labels for roads without an official name; they are not real street names.
+const placeholderStreetSource = '^(?:(?:unnamed|unknown|no +name)(?: +(?:road|rd|street|st|lane|way))?|(?:đường +)?không +tên|(?:ถนน)?ไม่มีชื่อ|(?:(?:calle|camino|avenida) +)?sin +nombre|(?:(?:rua|travessa|estrada|avenida) +)?sem +(?:nome|denominação)|[iİ]simsiz(?: +(?:sokak|cadde|sokağı|caddesi))?|(?:(?:طريق|شارع) +)?بدون +اسم)$';
+const placeholderStreetPattern = new RegExp(placeholderStreetSource, 'iu');
+const placeholderStreetNames = [
+  'unnamed', 'unnamed road', 'unnamed street', 'unknown', 'unknown road', 'unknown street', 'no name', 'no name road',
+  'no name street', 'không tên', 'đường không tên', 'ไม่มีชื่อ', 'ถนนไม่มีชื่อ', 'sin nombre', 'calle sin nombre',
+  'camino sin nombre', 'sem nome', 'rua sem nome', 'sem denominação', 'rua sem denominação', 'isimsiz', 'isimsiz sokak',
+  'isimsiz cadde', 'i̇simsiz', 'i̇simsiz sokak', 'i̇simsiz cadde', 'بدون اسم', 'طريق بدون اسم', 'شارع بدون اسم'
+];
+export const isPlaceholderStreet = (value) => placeholderStreetPattern.test(String(value ?? '').normalize('NFKC').replace(/\s+/gu, ' ').trim());
+
 const clean = (value) => String(value ?? '').normalize('NFKC').replace(/\s+/gu, ' ').trim();
 const compact = (value) => clean(value).replace(/\s+/gu, '').toUpperCase();
 const letters = /\p{L}/u;
@@ -163,6 +174,7 @@ export const validateAddressQuality = ({ countryCode, components, latitude, long
   }
   if (!streetLevel && !clean(normalizedComponents.houseNumber)) reasons.push('missing_house_number');
   if (!clean(normalizedComponents.street)) reasons.push('missing_street');
+  else if (isPlaceholderStreet(normalizedComponents.street)) reasons.push('placeholder_street');
   if (policy?.admin1 && !clean(normalizedComponents.admin1 || normalizedComponents.admin1Code)) reasons.push('missing_admin1');
   if (policy?.locality && !localityValue(normalizedComponents)) reasons.push('missing_locality');
   if (policy?.district && !districtValue(normalizedComponents)) reasons.push('missing_district');
@@ -193,7 +205,8 @@ export const addressQualitySqlClause = (prefix = '') => {
     AND trim(${prefix}house_number) = '' AND trim(${prefix}building_name) = '' AND ${prefix}property_type = 'unknown')`;
   const groups = new Map();
   for (const [country, policy] of Object.entries(policies)) {
-    const checks = [`((${prefix}match_level IN ('premise','subpremise') AND ${value('house_number')}) OR ${streetLevel})`, value('street')];
+    const checks = [`((${prefix}match_level IN ('premise','subpremise') AND ${value('house_number')}) OR ${streetLevel})`, value('street'),
+      `lower(trim(${prefix}street)) NOT IN (${placeholderStreetNames.map((name) => `'${name}'`).join(',')})`];
     if (policy.admin1) checks.push(region);
     if (policy.locality) checks.push(city);
     if (policy.district) checks.push(district);

@@ -762,7 +762,8 @@ export const createSourceAdapters = ({
   credentialPool = null,
   credentialBrokerClient = null,
   loadSeedLocations = async () => [],
-  loadGoogleCoverageTargets = async () => []
+  loadGoogleCoverageTargets = async () => [],
+  resolveGeofabrikUrl = null
 } = {}) => {
   const apiFetchImpl = fetchImpl;
   const useCurlTransport = fetchImpl === fetch;
@@ -944,9 +945,10 @@ export const createSourceAdapters = ({
   };
   const resolvedGeofabrikUrls = new Map();
   const geofabrikPbfUrl = (url) => {
-    if (!url || !useCurlTransport) return Promise.resolve(url);
+    const resolver = resolveGeofabrikUrl || (useCurlTransport ? (target) => resolveGeofabrikPbfUrl(target, { signal }) : null);
+    if (!url || !resolver) return Promise.resolve(url);
     if (!resolvedGeofabrikUrls.has(url)) {
-      resolvedGeofabrikUrls.set(url, resolveGeofabrikPbfUrl(url, { signal })
+      resolvedGeofabrikUrls.set(url, Promise.resolve(resolver(url))
         .catch((error) => { resolvedGeofabrikUrls.delete(url); throw error; }));
     }
     return resolvedGeofabrikUrls.get(url);
@@ -1160,14 +1162,18 @@ export const createSourceAdapters = ({
           }
           if (progress.schemaVersion !== 2 || progress.version !== googleResidentialRevision
             || !String(progress.rawVersion || '') || !/^[a-f\d]{64}$/u.test(String(progress.sourceChecksum || ''))) continue;
-          const rawIdentity = createHash('sha256')
-            .update(`${dataUrl}\u001f${progress.rawVersion}`).digest('hex').slice(0, 16);
-          const rawFile = resolve(rawRoot, `${rawIdentity}-${basename(new URL(dataUrl).pathname)}`);
-          const sourceBytes = await existingFileSize(rawFile);
-          if (!(sourceBytes > 0)) throw sourceStateError('Google residential raw source', new Error('Raw source is missing or empty'));
-          if (sourceBytes > 0) return {
+          // Checkpoints created before dated-extract resolution keyed their raw file by the `-latest` URL.
+          let resumed = null;
+          for (const candidateUrl of [...new Set([dataUrl, feature.properties.urls.pbf])]) {
+            const rawIdentity = createHash('sha256')
+              .update(`${candidateUrl}\u001f${progress.rawVersion}`).digest('hex').slice(0, 16);
+            const sourceBytes = await existingFileSize(resolve(rawRoot, `${rawIdentity}-${basename(new URL(candidateUrl).pathname)}`));
+            if (sourceBytes > 0) { resumed = { dataUrl: candidateUrl, sourceBytes }; break; }
+          }
+          if (!resumed) throw sourceStateError('Google residential raw source', new Error('Raw source is missing or empty'));
+          return {
             adapter: 'google-residential-enrichment', version: googleResidentialRevision,
-            rawVersion: progress.rawVersion, publishedAt: null, dataUrl, sourceBytes,
+            rawVersion: progress.rawVersion, publishedAt: null, ...resumed,
             estimateMethod: 'resumable-checkpoint'
           };
         } catch (error) {

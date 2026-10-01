@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addressQualitySqlClause,
   countryAddressPolicies,
+  isPlaceholderStreet,
   normalizeAddressFacts,
   normalizePostcode,
   validateAddressQuality
@@ -72,6 +73,15 @@ describe('country address quality gate', () => {
     ['US', { ...base, postcode: '1234' }, 'invalid_postcode']
   ])('rejects incomplete or malformed %s records', (countryCode, components, reason) => {
     expect(validateAddressQuality({ countryCode, components })).toMatchObject({ valid: false, reasons: expect.arrayContaining([reason]) });
+  });
+
+  it('rejects geocoder placeholder street names but keeps real names that contain those words', () => {
+    for (const street of ['Unnamed Road', 'Đường không tên', 'ถนนไม่มีชื่อ', 'Calle sin nombre', 'Rua Sem Denominação', 'İsimsiz Sokak', 'طريق بدون اسم']) {
+      expect(isPlaceholderStreet(street)).toBe(true);
+      expect(validateAddressQuality({ countryCode: 'NG', components: { ...base, street, postcode: '' } }).reasons).toContain('placeholder_street');
+    }
+    for (const street of ['Unnamed Valley Road', 'Sin Nombre Avenue', 'İnönü Caddesi', 'Main Road']) expect(isPlaceholderStreet(street)).toBe(false);
+    expect(addressQualitySqlClause()).toContain("'unnamed road'");
   });
 
   it('accepts complete German, Indian and US records', () => {
