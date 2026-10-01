@@ -65,7 +65,7 @@ describe('country address quality gate', () => {
 
   it.each([
     ['DE', { ...base, locality: '', postcode: '' }, 'missing_locality'],
-    ['IN', { ...base, district: '', postcode: '' }, 'missing_district'],
+    ['MX', { ...base, district: '', postcode: '' }, 'missing_district'],
     ['US', { ...base, admin1: '', postcode: '' }, 'missing_admin1'],
     ['DE', { ...base, admin1: '', district: '', postcode: 'ABCDE' }, 'invalid_postcode'],
     ['IN', { ...base, postcode: '012345' }, 'invalid_postcode'],
@@ -77,6 +77,9 @@ describe('country address quality gate', () => {
   it('accepts complete German, Indian and US records', () => {
     expect(validateAddressQuality({ countryCode: 'DE', components: { ...base, admin1: '', district: '', postcode: '10115' } }).valid).toBe(true);
     expect(validateAddressQuality({ countryCode: 'IN', components: { ...base, postcode: '110001' } }).valid).toBe(true);
+    for (const countryCode of ['IN', 'BR', 'NG', 'ZA', 'PH', 'TR', 'KR', 'TH', 'SA']) {
+      expect(validateAddressQuality({ countryCode, components: { ...base, district: '', postcode: '' } }).reasons).not.toContain('missing_district');
+    }
     expect(validateAddressQuality({ countryCode: 'US', components: { ...base, district: '', postcode: '19103' } }).valid).toBe(true);
   });
 

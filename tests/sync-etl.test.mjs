@@ -131,14 +131,16 @@ const source = {
 describe('address source shard catalog', () => {
   it('expands independently supported country shards with explicit refresh intervals', async () => {
     const catalog = await loadSourceCatalog();
-    expect(catalog.shards).toHaveLength(153);
+    expect(catalog.shards).toHaveLength(156);
     expect(catalog.shards.filter((shard) => shard.id !== 'korea-kapt-residential')
       .every((shard) => shard.intervalDays === 30)).toBe(true);
     expect(catalog.shards.some((shard) => shard.countryCode === 'CN')).toBe(false);
-    expect(catalog.shards.filter((shard) => shard.countryCode === 'NG')).toHaveLength(1);
+    expect(catalog.shards.filter((shard) => shard.countryCode === 'NG').map((shard) => shard.source.adapter).sort())
+      .toEqual(['geofabrik', 'google-residential-enrichment']);
     for (const countryCode of ['AU', 'IT']) {
       expect(catalog.shards.filter((shard) => shard.countryCode === countryCode)).toHaveLength(2);
     }
+    expect(catalog.shards.filter((shard) => shard.source.adapter === 'overture' && ['BR', 'SG'].includes(shard.countryCode))).toHaveLength(2);
     expect(catalog.shards.filter((shard) => shard.countryCode === 'ES')).toHaveLength(5);
     expect(catalog.shards.filter((shard) => shard.countryCode === 'CA')).toHaveLength(3);
     expect(catalog.shards.filter((shard) => shard.countryCode === 'FR')).toHaveLength(32);
