@@ -252,7 +252,13 @@ const runTranslationBatch = async ({ database, environment = process.env, fetchI
     }
     const firstLane = Number(progress.lane || 0) % 3;
     progress.lane = (firstLane + 1) % 3;
-    const candidates = [...recoveryCandidates([due, rows, terminal], firstLane)];
+    // Countries still below their address target are translated and published first.
+    const belowTarget = new Set((await database.prepare(`SELECT policy.country_code FROM sync_country_policies policy
+      LEFT JOIN sync_country_state state ON state.country_code=policy.country_code
+      WHERE policy.enabled=1 AND coalesce(state.address_count,0)<policy.target_count`).all().catch(() => ({ results: [] })))
+      .results.map((row) => row.country_code));
+    const candidates = [...recoveryCandidates([due, rows, terminal], firstLane)]
+      .sort((left, right) => Number(belowTarget.has(right.country_code)) - Number(belowTarget.has(left.country_code)));
     let prefetched = new Map();
     let recoveryStates = new Map();
     let cachedValues = {};
@@ -362,7 +368,8 @@ const runTranslationBatch = async ({ database, environment = process.env, fetchI
     // Publish the country with the most ready rows; the rest stay cached and are retried next batch.
     const readyByCountry = new Map();
     for (const { row } of ready) readyByCountry.set(row.country_code, (readyByCountry.get(row.country_code) || 0) + 1);
-    const country = [...readyByCountry].sort((left, right) => right[1] - left[1])[0]?.[0];
+    const country = [...readyByCountry].sort((left, right) => Number(belowTarget.has(right[0])) - Number(belowTarget.has(left[0]))
+      || right[1] - left[1])[0]?.[0];
     ready.filter(({ row }) => row.country_code !== country).forEach(({ row }) => deferred.add(row.id));
     phase = 'publication';
     await publish(database, ready.filter(({ row }) => !deferred.has(row.id)), services.revision, now, signal, outcome);
