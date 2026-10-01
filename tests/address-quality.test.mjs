@@ -76,7 +76,7 @@ describe('country address quality gate', () => {
   });
 
   it('rejects geocoder placeholder street names but keeps real names that contain those words', () => {
-    for (const street of ['Unnamed Road', 'Đường không tên', 'ถนนไม่มีชื่อ', 'Calle sin nombre', 'Rua Sem Denominação', 'İsimsiz Sokak', 'طريق بدون اسم']) {
+    for (const street of ['Unnamed Road', 'Đường không tên', 'Đường Chưa Đặt Tên', 'ถนนไม่มีชื่อ', 'Calle sin nombre', 'Rua Sem Denominação', 'İsimsiz Sokak', 'طريق بدون اسم']) {
       expect(isPlaceholderStreet(street)).toBe(true);
       expect(validateAddressQuality({ countryCode: 'NG', components: { ...base, street, postcode: '' } }).reasons).toContain('placeholder_street');
     }

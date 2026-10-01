@@ -192,7 +192,7 @@ const publish = async (database, candidates, revision, now, signal, outcome) => 
 };
 
 const runTranslationBatch = async ({ database, environment = process.env, fetchImpl = fetch,
-  pendingLimit = integer(environment.TRANSLATION_BACKFILL_BATCH, 30, 300),
+  pendingLimit = integer(environment.TRANSLATION_BACKFILL_BATCH, 150, 300),
   scanLimit = integer(environment.TRANSLATION_BACKFILL_SCAN, 2000, 20_000),
   now = () => new Date(), signal: parentSignal, brokerClient, cacheOnly: onlyCached = false, countryCodes = [] }) => {
   const countries = [...new Set(countryCodes.map((country) => String(country).toUpperCase()))];
@@ -349,7 +349,10 @@ const runTranslationBatch = async ({ database, environment = process.env, fetchI
       }
     }
     ready = pending.filter(({ row, variants }) => readyToPublish(row, variants, now()));
-    const country = ready[0]?.row.country_code;
+    // Publish the country with the most ready rows; the rest stay cached and are retried next batch.
+    const readyByCountry = new Map();
+    for (const { row } of ready) readyByCountry.set(row.country_code, (readyByCountry.get(row.country_code) || 0) + 1);
+    const country = [...readyByCountry].sort((left, right) => right[1] - left[1])[0]?.[0];
     ready.filter(({ row }) => row.country_code !== country).forEach(({ row }) => deferred.add(row.id));
     phase = 'publication';
     await publish(database, ready.filter(({ row }) => !deferred.has(row.id)), services.revision, now, signal, outcome);

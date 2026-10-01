@@ -510,6 +510,36 @@ describe('source-backed translation recovery', () => {
     expect(await database.prepare('SELECT COUNT(*) AS total FROM address_generation_index WHERE active=1').first('total')).toBe(2);
   });
 
+  it('publishes the country with the most ready rows first and defers the rest', async () => {
+    const canadian = { ...native, locality: 'Ottawa', admin1: 'Ontario', admin1Code: 'ON' };
+    await database.exec(`INSERT INTO address_datasets(id,source_id,country_code,version,retrieved_at,imported_at,input_checksum,
+      format,license_code,license_name,license_url,attribution_text,attribution_url,terms_url,share_alike,notice_required,
+      redistribution_allowed,status)
+      SELECT 'canada-dataset',source_id,'CA',version,retrieved_at,imported_at,input_checksum,format,license_code,license_name,
+        license_url,attribution_text,attribution_url,terms_url,share_alike,notice_required,redistribution_allowed,status
+      FROM address_datasets WHERE id='dataset'`);
+    for (const [id, longitude] of [['z-canada-a', -75.69], ['z-canada-b', -75.7]]) {
+      await database.prepare(`INSERT INTO address_pool(id,country_code,admin1,admin1_code,locality,street,house_number,
+        latitude,longitude,native_language,component_variants_json,address_variants_json,property_type,quality_score,
+        generation,coverage,random_key,active,first_seen_at,last_seen_at,retired_at,match_level)
+        VALUES (?,'CA','Ontario','ON','Ottawa','Main Street 21','',45.42,?,'en',?,?,'unknown',.95,
+          'v1','CA/ON',2,0,?,?,'publication-validation:fixture','street')`)
+        .bind(id, longitude, JSON.stringify({ native: canadian, en: canadian, 'zh-CN': canadian }),
+          JSON.stringify({ native: 'Main Street 21, Ottawa, Ontario', en: '', 'zh-CN': '' }), observedAt, observedAt).run();
+      await database.prepare(`INSERT INTO address_pool_evidence(id,address_id,dataset_id,source_record_id,
+        observed_at,evidence_type,is_primary,is_current,created_at)
+        VALUES (?,?,'canada-dataset',?,?,'address_existence',1,1,?)`).bind(`${id}-evidence`, id, `way/${id}`, observedAt, observedAt).run();
+    }
+    const fetchImpl = vi.fn(async (url) => {
+      const response = await translate(url);
+      return new Response((await response.text()).replaceAll('Ottawa', '渥太华').replaceAll('Ontario', '安大略省'),
+        { headers: { 'Content-Type': 'application/json' } });
+    });
+    expect((await runTranslationBackfillBatch({ database, environment: {}, fetchImpl, now })).updated).toBe(2);
+    expect(await database.prepare("SELECT reason FROM translation_recovery WHERE address_id='street-fixture'").first('reason'))
+      .toBe('publication_deferred');
+  });
+
   it('waits on an occupied publication lock and retries cached results without charging attempts', async () => {
     vi.spyOn(database, 'transaction').mockRejectedValueOnce(Object.assign(new Error('fixture lock busy'), { code: '55P03' }));
     expect((await runTranslationBackfillBatch({ database, environment: {}, fetchImpl: translate, now })).updated).toBe(0);

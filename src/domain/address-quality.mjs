@@ -32,11 +32,11 @@ const policies = {
 };
 
 // Geocoders return these labels for roads without an official name; they are not real street names.
-const placeholderStreetSource = '^(?:(?:unnamed|unknown|no +name)(?: +(?:road|rd|street|st|lane|way))?|(?:đường +)?không +tên|(?:ถนน)?ไม่มีชื่อ|(?:(?:calle|camino|avenida) +)?sin +nombre|(?:(?:rua|travessa|estrada|avenida) +)?sem +(?:nome|denominação)|[iİ]simsiz(?: +(?:sokak|cadde|sokağı|caddesi))?|(?:(?:طريق|شارع) +)?بدون +اسم)$';
+const placeholderStreetSource = '^(?:(?:unnamed|unknown|no +name)(?: +(?:road|rd|street|st|lane|way))?|(?:đường +)?(?:không +tên|chưa +đặt +tên)|(?:ถนน)?ไม่มีชื่อ|(?:(?:calle|camino|avenida) +)?sin +nombre|(?:(?:rua|travessa|estrada|avenida) +)?sem +(?:nome|denominação)|[iİ]simsiz(?: +(?:sokak|cadde|sokağı|caddesi))?|(?:(?:طريق|شارع) +)?بدون +اسم)$';
 const placeholderStreetPattern = new RegExp(placeholderStreetSource, 'iu');
 const placeholderStreetNames = [
   'unnamed', 'unnamed road', 'unnamed street', 'unknown', 'unknown road', 'unknown street', 'no name', 'no name road',
-  'no name street', 'không tên', 'đường không tên', 'ไม่มีชื่อ', 'ถนนไม่มีชื่อ', 'sin nombre', 'calle sin nombre',
+  'no name street', 'không tên', 'đường không tên', 'chưa đặt tên', 'đường chưa đặt tên', 'ไม่มีชื่อ', 'ถนนไม่มีชื่อ', 'sin nombre', 'calle sin nombre',
   'camino sin nombre', 'sem nome', 'rua sem nome', 'sem denominação', 'rua sem denominação', 'isimsiz', 'isimsiz sokak',
   'isimsiz cadde', 'i̇simsiz', 'i̇simsiz sokak', 'i̇simsiz cadde', 'بدون اسم', 'طريق بدون اسم', 'شارع بدون اسم'
 ];
