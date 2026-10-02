@@ -18,7 +18,7 @@ import {
   fetchAmapDistrict, fetchBrokerCommunities, parseAmapDistrict, providerFetcher, ProviderRequestError,
   type AmapDistrict, type ChinaCredentialBroker, type CommunityCandidate, type ProviderPage, type SearchArea
 } from './providers';
-import { isChinaDeliveryAddress, normalizeChinaProviderAddress } from './quality';
+import { normalizeChinaProviderAddress, withoutTrailingCommunityName } from './quality';
 import { canonicalPolicyNodeKey, getCountryPolicy, type CountryPolicy } from '../sync/address-policy.mjs';
 
 export const initialChinaCities = [
@@ -48,14 +48,12 @@ const roadsAgree = (left: string[], right: string[]): boolean => left.some((left
 const addressesAgree = (left: string, right: string): boolean => {
   const normalizedLeft = normalizedAddress(left);
   const normalizedRight = normalizedAddress(right);
-  if (!normalizedLeft || !normalizedRight) return false;
   const leftPremises = premiseNumbers(left);
   const rightPremises = premiseNumbers(right);
-  if (leftPremises.length || rightPremises.length) {
-    if (!leftPremises.length || !rightPremises.length) return false;
-    const rightPremiseSet = new Set(rightPremises);
-    if (!leftPremises.some((premise) => rightPremiseSet.has(premise))) return false;
-  }
+  // A community is identified by its name and location; only two conflicting house numbers separate same-named records.
+  if (!leftPremises.length || !rightPremises.length) return true;
+  const rightPremiseSet = new Set(rightPremises);
+  if (!leftPremises.some((premise) => rightPremiseSet.has(premise))) return false;
   if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) return true;
   return roadsAgree(addressRoads(normalizedLeft), addressRoads(normalizedRight));
 };
@@ -81,9 +79,9 @@ const candidateYieldInterval = 25;
 const targetYieldInterval = 50;
 const maxAreaCityBytes = 128 * 1024 * 1024;
 const checkpointStrategyVersions: Record<ProviderName, string> = {
-  amap: 'community-poi-v10-amap-around',
-  baidu: 'community-poi-v7',
-  tencent: 'community-poi-v7'
+  amap: 'community-poi-v11-amap-community',
+  baidu: 'community-poi-v8-community',
+  tencent: 'community-poi-v8-community'
 };
 const checkpointStrategyVersion = (provider: string): string =>
   checkpointStrategyVersions[provider as ProviderName] || 'community-poi-v7';
@@ -728,7 +726,7 @@ export class ChinaDataService {
     for (;;) {
       const rows = (await this.addressDb.prepare(`SELECT provider,provider_poi_id,target_adcode,name,address,province,city,district,
         township,longitude,latitude,raw_longitude,raw_latitude,raw_crs,response_hash,typecode,adcode
-        FROM cn_ingest_candidates WHERE decision='rejected' AND rejection_reason IN ('administrative_mismatch','missing_postcode')
+        FROM cn_ingest_candidates WHERE decision='rejected' AND rejection_reason IN ('administrative_mismatch','missing_postcode','invalid_delivery_address')
           AND (provider>? OR (provider=? AND provider_poi_id>?))
         ORDER BY provider,provider_poi_id LIMIT 500`).bind(provider, provider, providerPoiId)
         .all<Record<string, unknown>>()).results;
@@ -1713,7 +1711,7 @@ export class ChinaDataService {
     if (target?.city && comparableAdmin(candidate.city) !== comparableAdmin(target.city)
       && comparableAdmin(candidate.city) !== comparableAdmin(target.province)) return false;
     if (target?.district && comparableAdmin(candidate.district) !== comparableAdmin(target.district)) return false;
-    if (!candidate.province || !candidate.city || !candidate.district || !candidate.address) return false;
+    if (!candidate.province || !candidate.city || !candidate.district) return false;
     const count = await this.addressDb.prepare('SELECT COUNT(*) AS total FROM cn_admin_areas').first<number>('total');
     if (!count) return true;
     const province = await this.addressDb.prepare("SELECT adcode FROM cn_admin_areas WHERE level='province' AND name IN (?,?) LIMIT 1")
@@ -1768,7 +1766,6 @@ export class ChinaDataService {
     if (!candidate.province || !candidate.city || !candidate.district) return 'missing_administrative_area';
     if ((await this.chinaPostcodeCatalog()).length && !/^\d{6}$/u.test(candidate.postcode || '')) return 'missing_postcode';
     if (!Number.isFinite(candidate.latitude) || !Number.isFinite(candidate.longitude)) return 'invalid_coordinates';
-    if (!isChinaDeliveryAddress(candidate.address)) return 'invalid_delivery_address';
     const nonResidential = findNonResidentialMatch({
       countryCode: 'CN', buildingName: candidate.name, formattedAddress: candidate.address
     });
@@ -1781,7 +1778,8 @@ export class ChinaDataService {
   }
 
   private async processCandidate(candidate: CommunityCandidate, target?: SyncTarget, recordDecision?: (reason: string, inserted: number) => void): Promise<number> {
-    candidate = { ...candidate, address: normalizeChinaProviderAddress(candidate.address, candidate) };
+    candidate = { ...candidate,
+      address: withoutTrailingCommunityName(normalizeChinaProviderAddress(candidate.address, candidate), candidate.name) };
     if (!/^\d{6}$/u.test(candidate.postcode || '')) {
       candidate = { ...candidate, postcode: this.resolveChinaPostcode(candidate, await this.chinaPostcodeCatalog()) };
     }
@@ -1819,7 +1817,7 @@ export class ChinaDataService {
   private async upsertCandidate(candidate: CommunityCandidate): Promise<number> {
     const address = normalizeChinaProviderAddress(candidate.address, candidate);
     const postcodeRequired = (await this.chinaPostcodeCatalog()).length > 0;
-    if (!candidate.name || !providerResidentialTypeValid(candidate) || !isChinaDeliveryAddress(address) || !candidate.province || !candidate.city || !candidate.district
+    if (!candidate.name || !providerResidentialTypeValid(candidate) || !candidate.province || !candidate.city || !candidate.district
       || (postcodeRequired && !/^\d{6}$/u.test(candidate.postcode || ''))
       || !Number.isFinite(candidate.latitude) || !Number.isFinite(candidate.longitude)
       || findNonResidentialMatch({ countryCode: 'CN', buildingName: candidate.name, formattedAddress: address }).excluded

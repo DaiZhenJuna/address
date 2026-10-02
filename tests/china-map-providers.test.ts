@@ -115,14 +115,17 @@ describe('China map community providers', () => {
     expect(urls[2]).toContain(`query=${encodeURIComponent('东华门街道住宅小区')}`);
   });
 
-  it('keeps numbered delivery addresses, trims navigation suffixes, and rejects map directions', async () => {
+  it('keeps communities without house numbers and drops map directions from the address', async () => {
     const values = await fetchAmapCommunities('110105', 1, 'secret', response({ status: '1', pois: [
       { id: 'clean', name: '望京花园', address: '阜通东大街6号(望京地铁站C口步行410米)', location: '116.47,39.995', pname: '北京市', cityname: '北京市', adname: '朝阳区', typecode: '120302', adcode: '110105' },
       { id: 'intersection', name: '方向小区', address: '阜通东大街与望京街交叉口东40米', location: '116.47,39.995', pname: '北京市', cityname: '北京市', adname: '朝阳区', typecode: '120302', adcode: '110105' },
       { id: 'town-only', name: '村镇小区', address: '望京镇', location: '116.47,39.995', pname: '北京市', cityname: '北京市', adname: '朝阳区', typecode: '120302', adcode: '110105' }
     ] }));
-    expect(values.candidates).toHaveLength(1);
-    expect(values.candidates[0]).toMatchObject({ providerPoiId: 'clean', address: '阜通东大街6号' });
+    expect(values.candidates.map(({ providerPoiId, address }) => ({ providerPoiId, address }))).toEqual([
+      { providerPoiId: 'clean', address: '阜通东大街6号' },
+      { providerPoiId: 'intersection', address: '' },
+      { providerPoiId: 'town-only', address: '望京镇' }
+    ]);
   });
 
   it('reports Tencent provider quota headers', async () => {
@@ -172,7 +175,7 @@ describe('China map community providers', () => {
     expect(retryAt).toBeLessThanOrEqual(Date.now() + 7_100);
   });
 
-  it('rejects non-residential or non-deliverable Baidu and Tencent results', async () => {
+  it('rejects non-residential Tencent results and keeps Baidu communities on a road without a number', async () => {
     const tencent = await fetchTencentCommunities('北京市', 1, 'secret', response({ status: 0, data: [{
       id: 'shop', title: '望京商场', address: '阜通东大街6号', category: '购物:商场',
       location: { lat: 39.995, lng: 116.47 }, ad_info: { province: '北京市', city: '北京市', district: '朝阳区' }
@@ -182,7 +185,7 @@ describe('China map community providers', () => {
       province: '北京市', city: '北京市', area: '朝阳区', detail_info: { tag: '房地产;住宅区' }
     }] }));
     expect(tencent.candidates).toEqual([]);
-    expect(baidu.candidates).toEqual([]);
+    expect(baidu.candidates).toEqual([expect.objectContaining({ providerPoiId: 'road-only', address: '阜通东大街' })]);
   });
 
   it('redacts raw and URL-encoded provider keys from network errors', async () => {

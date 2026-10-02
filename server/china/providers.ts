@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { bd09ToWgs84, gcj02ToWgs84 } from './coordinates';
-import { isChinaDeliveryAddress, normalizeChinaDeliveryAddress } from './quality';
+import { cleanChinaDeliveryAddress } from './quality';
 import type { ProviderName, ProviderQuotaObservation } from '../control/store';
 
 export interface CommunityCandidate {
@@ -79,7 +79,7 @@ const requestErrorMessage = (error: unknown, url: URL): string => {
   return redactSecrets(message, secrets) || 'NETWORK_ERROR';
 };
 const presentCandidate = <T extends CommunityCandidate>(value: T | null): value is T => Boolean(
-  value?.providerPoiId && value.name && value.address && value.province && value.city && value.district
+  value?.providerPoiId && value.name && value.province && value.city && value.district
   && Number.isFinite(value.latitude) && Number.isFinite(value.longitude)
 );
 const residentialCategory = (value: string): boolean => /(?:住宅|小区|公寓|家园|花园|新村|嘉园|名苑|家属院)/u.test(value);
@@ -138,9 +138,8 @@ const parseAmapPage = (body: AmapResponse, region: string, key = ''): ProviderPa
     const [latitude, longitude] = gcj02ToWgs84(rawLatitude, rawLongitude);
     const typecode = clean(item.typecode); const adcode = clean(item.adcode);
     if (typecode !== '120302' || (/^\d{6}$/u.test(region) && adcode !== region)) return null;
-    const address = normalizeChinaDeliveryAddress(clean(item.address));
+    const address = cleanChinaDeliveryAddress(clean(item.address));
     const postcode = clean(item.postcode || (item.business as Record<string, unknown> | undefined)?.postcode);
-    if (!isChinaDeliveryAddress(address)) return null;
     return {
       provider: 'amap' as const, providerPoiId: clean(item.id), name: clean(item.name), address,
       province: clean(item.pname), city: clean(item.cityname), district: clean(item.adname), township: '', postcode,
@@ -221,10 +220,10 @@ export const fetchTencentCommunities = async (city: string, page: number, key: s
     const rawLatitude = finite(location?.lat); const rawLongitude = finite(location?.lng);
     if (rawLatitude === null || rawLongitude === null) return null;
     const [latitude, longitude] = gcj02ToWgs84(rawLatitude, rawLongitude);
-    const address = normalizeChinaDeliveryAddress(clean(item.address));
+    const address = cleanChinaDeliveryAddress(clean(item.address));
     const postcode = clean(item.postcode);
     const typecode = clean(item.category);
-    if (!residentialCategory(typecode) || !isChinaDeliveryAddress(address)) return null;
+    if (!residentialCategory(typecode)) return null;
     return {
       provider: 'tencent' as const, providerPoiId: clean(item.id), name: clean(item.title),
       province: clean(admin?.province), city: clean(admin?.city), district: clean(admin?.district), township: '',
@@ -255,10 +254,10 @@ export const fetchBaiduCommunities = async (city: string, page: number, key: str
     const rawLatitude = finite(location?.lat); const rawLongitude = finite(location?.lng);
     if (rawLatitude === null || rawLongitude === null) return null;
     const [latitude, longitude] = bd09ToWgs84(rawLatitude, rawLongitude);
-    const address = normalizeChinaDeliveryAddress(clean(item.address));
+    const address = cleanChinaDeliveryAddress(clean(item.address));
     const postcode = clean(item.postcode);
     const typecode = clean(detail?.tag);
-    if (!residentialCategory(typecode) || !isChinaDeliveryAddress(address)) return null;
+    if (!residentialCategory(typecode)) return null;
     return {
       provider: 'baidu' as const, providerPoiId: clean(item.uid), name: clean(item.name),
       province: clean(item.province), city: clean(item.city), district: clean(item.area), township: '',
@@ -288,10 +287,10 @@ export const fetchBrokerCommunities = async (
       const rawLatitude = finite(location?.lat); const rawLongitude = finite(location?.lng);
       if (rawLatitude === null || rawLongitude === null) return null;
       const [latitude, longitude] = gcj02ToWgs84(rawLatitude, rawLongitude);
-      const address = normalizeChinaDeliveryAddress(clean(item.address));
+      const address = cleanChinaDeliveryAddress(clean(item.address));
       const postcode = clean(item.postcode);
       const typecode = clean(item.category);
-      if (!residentialCategory(typecode) || !isChinaDeliveryAddress(address)) return null;
+      if (!residentialCategory(typecode)) return null;
       return {
         provider: 'tencent' as const, providerPoiId: clean(item.id), name: clean(item.title),
         province: clean(admin?.province), city: clean(admin?.city), district: clean(admin?.district), township: '',
@@ -308,10 +307,10 @@ export const fetchBrokerCommunities = async (
     const rawLatitude = finite(location?.lat); const rawLongitude = finite(location?.lng);
     if (rawLatitude === null || rawLongitude === null) return null;
     const [latitude, longitude] = bd09ToWgs84(rawLatitude, rawLongitude);
-    const address = normalizeChinaDeliveryAddress(clean(item.address));
+    const address = cleanChinaDeliveryAddress(clean(item.address));
     const postcode = clean(item.postcode);
     const typecode = clean(detail?.tag);
-    if (!residentialCategory(typecode) || !isChinaDeliveryAddress(address)) return null;
+    if (!residentialCategory(typecode)) return null;
     return {
       provider: 'baidu' as const, providerPoiId: clean(item.uid), name: clean(item.name),
       province: clean(item.province), city: clean(item.city), district: clean(item.area), township: '',
