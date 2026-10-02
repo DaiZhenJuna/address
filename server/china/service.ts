@@ -11,12 +11,12 @@ import {
   chinaCommunityPublicationClause,
   chinaFreshTimestampClause
 } from '../api/repositories/china-community';
-import { distanceMeters } from './coordinates';
+import { distanceMeters, gcj02ToWgs84, wgs84ToGcj02 } from './coordinates';
 import { chinaDistrictPostcode } from './district-postcodes';
 import { CredentialBrokerClient } from '../credential-broker/client.mjs';
 import {
-  fetchBrokerCommunities, providerFetcher, ProviderRequestError,
-  type ChinaCredentialBroker, type CommunityCandidate, type ProviderPage
+  fetchAmapDistrict, fetchBrokerCommunities, parseAmapDistrict, providerFetcher, ProviderRequestError,
+  type AmapDistrict, type ChinaCredentialBroker, type CommunityCandidate, type ProviderPage, type SearchArea
 } from './providers';
 import { isChinaDeliveryAddress, normalizeChinaProviderAddress } from './quality';
 import { canonicalPolicyNodeKey, getCountryPolicy, type CountryPolicy } from '../sync/address-policy.mjs';
@@ -81,18 +81,24 @@ const candidateYieldInterval = 25;
 const targetYieldInterval = 50;
 const maxAreaCityBytes = 128 * 1024 * 1024;
 const checkpointStrategyVersions: Record<ProviderName, string> = {
-  amap: 'community-poi-v9-amap-compatible',
+  amap: 'community-poi-v10-amap-around',
   baidu: 'community-poi-v7',
   tencent: 'community-poi-v7'
 };
 const checkpointStrategyVersion = (provider: string): string =>
   checkpointStrategyVersions[provider as ProviderName] || 'community-poi-v7';
 const credentialPacingMaxWaitMs = 1_100;
+const amapDistrictRadiusMeters = 50_000;
+const amapTownshipRadiusMeters = 5_000;
+// County-level cities without districts appear in AreaCity as `<city adcode>000` pseudo-districts; AMap uses the city adcode.
+const amapAdcode = (id: string): string => /^\d{6}$/u.test(id) ? id : /^\d{6}000$/u.test(id) ? id.slice(0, 6) : '';
+const townshipNameKey = (value: string): string => String(value || '').normalize('NFKC').replace(/\s+/gu, '')
+  .replace(/(?:街道办事处|街道|民族乡|镇|乡|地区|办事处)$/u, '');
 const chinaWorkerLeaseId = 'china-sync';
 const chinaWorkerLeaseDurationMs = 60_000;
 const chinaWorkerLeaseHeartbeatMs = 20_000;
 const chinaWorkerShutdownGraceMs = 95 * 60_000;
-const chinaExecutionRevision = 'china-runtime-v3-amap-compatibility';
+const chinaExecutionRevision = 'china-runtime-v4-amap-around-city-adcode';
 const mainlandProvincePrefixes = [
   '11', '12', '13', '14', '15', '21', '22', '23', '31', '32', '33', '34', '35', '36', '37',
   '41', '42', '43', '44', '45', '46', '50', '51', '52', '53', '54', '61', '62', '63', '64', '65'
@@ -368,6 +374,7 @@ export class ChinaDataService {
   private postcodeCatalogPromise: Promise<ChinaPostcodeRow[]> | undefined;
   private districtPostcode: typeof chinaDistrictPostcode = chinaDistrictPostcode;
   private postcodeIndexPromise: Promise<Map<string, ChinaPostcodeRow[]>> | undefined;
+  private readonly amapDistricts = new Map<string, Promise<AmapDistrict>>();
   private readonly credentialBroker: ChinaCredentialBroker | null;
   private readonly leaseOwnerToken = randomUUID();
   private leaseHeld = false;
@@ -1210,8 +1217,10 @@ export class ChinaDataService {
           if (processedCandidates % candidateYieldInterval === 0) await yieldEventLoop();
         }
       };
+      // An AMap radius window that ran dry before the page cap already enumerated its district; townships add nothing.
       const districtWindowTerminal = async (provider: ProviderName, districtAdcode: string): Promise<boolean> => {
         const maxPages = maxPagesForProvider(provider);
+        if (provider === 'amap' && await this.checkpointStatus(provider, districtAdcode) === 'exhausted') return false;
         return await this.resumePage(provider, districtAdcode, maxPages) > maxPages;
       };
       const townshipQueue = async (provider: ProviderName, districtAdcode: string): Promise<Array<{ adcode: string; name: string; page: number }>> => {
@@ -1485,7 +1494,10 @@ export class ChinaDataService {
           JOIN cn_sync_area_targets target ON target.adcode=township.parent_adcode AND target.enabled=1
           LEFT JOIN cn_sync_checkpoints checkpoint ON checkpoint.city=township.adcode
             AND checkpoint.provider=? AND checkpoint.strategy_version=?
+          LEFT JOIN cn_sync_checkpoints district_checkpoint ON district_checkpoint.city=target.adcode
+            AND district_checkpoint.provider=? AND district_checkpoint.strategy_version=?
           WHERE target.adcode IN (${placeholders}) AND township.level='township'
+            AND NOT (?='amap' AND COALESCE(district_checkpoint.status,'')='exhausted')
             AND (checkpoint.city IS NULL OR NOT (
             checkpoint.status='exhausted' OR checkpoint.page>?
             OR (checkpoint.status='adapter_rejected_all' AND checkpoint.page>=?)
@@ -1493,7 +1505,8 @@ export class ChinaDataService {
           LIMIT 1
         `)
         .bind(provider, checkpointStrategyVersion(provider), ...remaining, maxPages, maxPages,
-          provider, checkpointStrategyVersion(provider), ...remaining, maxPages, maxPages)
+          provider, checkpointStrategyVersion(provider), provider, checkpointStrategyVersion(provider),
+          ...remaining, provider, maxPages, maxPages)
         .first('pending');
       return value ? provider : null;
     }));
@@ -1546,11 +1559,15 @@ export class ChinaDataService {
   ): Promise<ProviderPage | null> {
     const key = checkpointKey || target.id;
     let lastError = '';
-    const region = provider === 'amap' && /^\d{6}$/u.test(target.id) ? target.id : target.query;
+    const region = provider === 'amap' && amapAdcode(target.id) ? amapAdcode(target.id) : target.query;
+    // A district without a resolvable center falls back to the keyword request and its failure handling.
+    const resolved = provider === 'amap' ? await this.amapSearchArea(target, key, subdivision).catch(() => null) : null;
+    if (resolved === 'skip') return { candidates: [], rawCount: 0, pageSignature: 'amap-no-search-center' };
+    const area = resolved || undefined;
     if (this.credentialBroker) {
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const result = await fetchBrokerCommunities(provider, region, page, this.credentialBroker, subdivision);
+          const result = await fetchBrokerCommunities(provider, region, page, this.credentialBroker, subdivision, area);
           await requested();
           return result;
         } catch (error) {
@@ -1595,7 +1612,7 @@ export class ChinaDataService {
       attemptedCredentialIds.add(credential.id);
       try {
         let quotaObservation: ProviderQuotaObservation | undefined;
-        const result = await providerFetcher[provider](region, page, credential.secret, fetch, (value) => { quotaObservation = value; }, subdivision);
+        const result = await providerFetcher[provider](region, page, credential.secret, fetch, (value) => { quotaObservation = value; }, subdivision, area);
         await requested();
         await this.control.reportCredential(credential.id, 'success', quotaObservation);
         return result;
@@ -1608,6 +1625,75 @@ export class ChinaDataService {
           ? { retryAt: error.retryAt, period: error.quotaPeriod } : undefined);
         await this.writeCheckpoint(provider, key, page, 'failed', accepted, lastError);
       }
+    }
+  }
+
+  // Radius-search centers are cached as WGS-84 in cn_admin_areas and resolved once per district.
+  private async amapSearchArea(target: SyncTarget, checkpointKey: string, subdivision: string): Promise<SearchArea | 'skip' | null> {
+    const districtAdcode = amapAdcode(target.id) ? target.id : '';
+    if (!districtAdcode || !await this.addressDb.prepare("SELECT 1 AS present FROM cn_admin_areas WHERE adcode=? AND level='district'")
+      .bind(districtAdcode).first('present')) return null;
+    const adcode = subdivision ? checkpointKey : districtAdcode;
+    const stored = async () => await this.addressDb.prepare('SELECT latitude,longitude FROM cn_admin_areas WHERE adcode=?')
+      .bind(adcode).first<{ latitude: number | null; longitude: number | null }>();
+    let row = await stored();
+    if (row?.latitude == null || row?.longitude == null) {
+      await this.cacheAmapDistrictCenters(districtAdcode);
+      row = await stored();
+    }
+    // A township AMap does not list cannot be searched by radius; the keyword request is WAF-blocked.
+    if (row?.latitude == null || row?.longitude == null) return subdivision ? 'skip' : null;
+    const [latitude, longitude] = wgs84ToGcj02(Number(row.latitude), Number(row.longitude));
+    return { location: `${longitude.toFixed(6)},${latitude.toFixed(6)}`,
+      radius: subdivision ? amapTownshipRadiusMeters : amapDistrictRadiusMeters };
+  }
+
+  private amapDistrict(keywords: string): Promise<AmapDistrict> {
+    let pending = this.amapDistricts.get(keywords);
+    if (!pending) {
+      pending = this.requestAmapDistrict(keywords);
+      this.amapDistricts.set(keywords, pending);
+      pending.catch(() => this.amapDistricts.delete(keywords));
+    }
+    return pending;
+  }
+
+  private async requestAmapDistrict(keywords: string): Promise<AmapDistrict> {
+    if (this.credentialBroker) return parseAmapDistrict(await this.credentialBroker.request('amap.district', { keywords }));
+    const credential = await this.control.acquireCredential('amap');
+    if (!credential) throw Object.assign(new Error('NO_AVAILABLE_KEY'), { code: 'SOURCE_CREDENTIAL_UNAVAILABLE' });
+    try {
+      const district = await fetchAmapDistrict(keywords, credential.secret);
+      await this.control.reportCredential(credential.id, 'success');
+      return district;
+    } catch (error) {
+      await this.control.reportCredential(credential.id, error instanceof ProviderRequestError ? error.outcome : 'network',
+        error instanceof ProviderRequestError ? { retryAt: error.retryAt, period: error.quotaPeriod } : undefined);
+      throw error;
+    }
+  }
+
+  private async cacheAmapDistrictCenters(districtAdcode: string): Promise<void> {
+    const district = await this.amapDistrict(amapAdcode(districtAdcode));
+    const now = nowIso();
+    const save = async (adcode: string, center: { latitude: number; longitude: number }) => {
+      const [latitude, longitude] = gcj02ToWgs84(center.latitude, center.longitude);
+      await this.addressDb.prepare('UPDATE cn_admin_areas SET latitude=?,longitude=?,updated_at=? WHERE adcode=?')
+        .bind(latitude, longitude, now, adcode).run();
+    };
+    if (district.center) await save(districtAdcode, district.center);
+    const townships = (await this.addressDb.prepare(`SELECT adcode,name FROM cn_admin_areas
+      WHERE parent_adcode=? AND level='township' AND latitude IS NULL`).bind(districtAdcode)
+      .all<{ adcode: string; name: string }>()).results;
+    const byName = new Map(district.townships.map((item) => [item.name, item]));
+    const byKey = new Map<string, AmapDistrict['townships'][number] | null>();
+    for (const item of district.townships) {
+      const nameKey = townshipNameKey(item.name);
+      byKey.set(nameKey, byKey.has(nameKey) ? null : item);
+    }
+    for (const township of townships) {
+      const match = byName.get(township.name) || byKey.get(townshipNameKey(township.name));
+      if (match) await save(township.adcode, match);
     }
   }
 

@@ -111,7 +111,7 @@ const requestJson = async (url: URL, fetcher: typeof fetch): Promise<{ body: unk
   try { return { body: await response.json(), headers: response.headers }; } catch { throw new ProviderRequestError('network', 'INVALID_JSON'); }
 };
 
-const parseAmapPage = (body: AmapResponse, region: string, key = ''): ProviderPage => {
+const assertAmapOk = (body: AmapResponse, key: string): void => {
   if (body.status !== '1') {
     const code = body.infocode || '';
     const outcome = ['10003', '10044', '10045', '40000'].includes(code) ? 'quota'
@@ -127,6 +127,10 @@ const parseAmapPage = (body: AmapResponse, region: string, key = ''): ProviderPa
     throw new ProviderRequestError(outcome, redactSecrets(body.info || body.infocode, [key]), code, retryAt,
       outcome === 'quota' ? quotaPeriod : undefined);
   }
+};
+
+const parseAmapPage = (body: AmapResponse, region: string, key = ''): ProviderPage => {
+  assertAmapOk(body, key);
   const pois = body.pois || [];
   const candidates = pois.map((item) => {
     const [rawLongitude, rawLatitude] = clean(item.location).split(',').map(Number);
@@ -151,12 +155,46 @@ const requestAmapPage = async (url: URL, region: string, key: string, fetcher: t
   return parseAmapPage(body, region, key);
 };
 
-export const fetchAmapCommunities = async (region: string, page: number, key: string, fetcher: typeof fetch = fetch, _observeQuota?: QuotaObserver, subdivision = ''): Promise<ProviderPage> => {
-  const url = new URL('https://restapi.amap.com/v3/place/text');
-  Object.entries({ key, city: region, types: '120302', citylimit: 'true', offset: '25', page: String(page), extensions: 'all' })
+export interface SearchArea { location: string; radius: number }
+
+export const fetchAmapCommunities = async (region: string, page: number, key: string, fetcher: typeof fetch = fetch, _observeQuota?: QuotaObserver, subdivision = '', area?: SearchArea): Promise<ProviderPage> => {
+  const url = new URL(`https://restapi.amap.com/v3/place/${area ? 'around' : 'text'}`);
+  Object.entries(area
+    ? { key, location: area.location, radius: String(area.radius), types: '120302', sortrule: 'distance', offset: '25', page: String(page), extensions: 'all' }
+    : { key, city: region, types: '120302', citylimit: 'true', offset: '25', page: String(page), extensions: 'all' })
     .forEach(([name, value]) => url.searchParams.set(name, value));
-  if (subdivision) url.searchParams.set('keywords', subdivision);
+  if (subdivision && !area) url.searchParams.set('keywords', subdivision);
   return await requestAmapPage(url, region, key, fetcher);
+};
+
+export interface AmapDistrict {
+  center: { latitude: number; longitude: number } | null;
+  townships: Array<{ name: string; latitude: number; longitude: number }>;
+}
+
+const amapCenter = (value: unknown): { latitude: number; longitude: number } | null => {
+  const [longitude, latitude] = clean(value).split(',').map(Number);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+};
+
+export const parseAmapDistrict = (body: unknown, key = ''): AmapDistrict => {
+  assertAmapOk(body as AmapResponse, key);
+  const district = ((body as { districts?: Array<Record<string, unknown>> }).districts || [])[0];
+  const children = (district?.districts || []) as Array<Record<string, unknown>>;
+  return {
+    center: amapCenter(district?.center),
+    townships: children.flatMap((item) => {
+      const center = amapCenter(item.center);
+      return center && clean(item.name) ? [{ name: clean(item.name), ...center }] : [];
+    })
+  };
+};
+
+export const fetchAmapDistrict = async (keywords: string, key: string, fetcher: typeof fetch = fetch): Promise<AmapDistrict> => {
+  const url = new URL('https://restapi.amap.com/v3/config/district');
+  Object.entries({ key, keywords, subdistrict: '1', extensions: 'base' }).forEach(([name, value]) => url.searchParams.set(name, value));
+  const { body } = await requestJson(url, fetcher);
+  return parseAmapDistrict(body, key);
 };
 
 export const fetchTencentCommunities = async (city: string, page: number, key: string, fetcher: typeof fetch = fetch, observeQuota?: QuotaObserver, subdivision = ''): Promise<ProviderPage> => {
@@ -236,9 +274,11 @@ export const fetchBrokerCommunities = async (
   region: string,
   page: number,
   broker: ChinaCredentialBroker,
-  subdivision = ''
+  subdivision = '',
+  area?: SearchArea
 ): Promise<ProviderPage> => {
-  const body = await broker.request(`${provider}.place-search`, { region, page, subdivision });
+  const body = await broker.request(`${provider}.place-search`, provider === 'amap' && area
+    ? { region, page, subdivision, location: area.location, radius: area.radius } : { region, page, subdivision });
   if (provider === 'amap') return parseAmapPage(body as AmapResponse, region);
   if (provider === 'tencent') {
     const data = (body as { data?: Array<Record<string, unknown>> })?.data || [];

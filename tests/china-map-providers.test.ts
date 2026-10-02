@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { bd09ToWgs84, gcj02ToWgs84, wgs84ToGcj02 } from '../server/china/coordinates';
 import {
-  fetchAmapCommunities, fetchBaiduCommunities, fetchBrokerCommunities, fetchTencentCommunities
+  fetchAmapCommunities, fetchAmapDistrict, fetchBaiduCommunities, fetchBrokerCommunities, fetchTencentCommunities
 } from '../server/china/providers';
+import { operationDefinitions } from '../server/credential-broker/operations.mjs';
 
 const response = (value: unknown) => async () => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
 
@@ -44,6 +45,41 @@ describe('China map community providers', () => {
       rawCount: 1, candidates: [expect.objectContaining({ provider: 'amap', providerPoiId: 'broker-a-1' })]
     });
     expect(JSON.stringify(requests)).not.toMatch(/key|secret/iu);
+  });
+
+  it('searches Amap by radius around a center and keeps the district boundary', async () => {
+    const urls: URL[] = [];
+    const page = await fetchAmapCommunities('110105', 2, 'secret', async (input) => {
+      urls.push(new URL(String(input)));
+      return Response.json({ status: '1', pois: [
+        { id: 'inside', name: '望京花园', address: '阜通东大街6号', location: '116.47,39.995', pname: '北京市', cityname: '北京市', adname: '朝阳区', typecode: '120302', adcode: '110105' },
+        { id: 'neighbor', name: '其他小区', address: '东城路1号', location: '116.41,39.91', pname: '北京市', cityname: '北京市', adname: '东城区', typecode: '120302', adcode: '110101' }
+      ] });
+    }, undefined, '望京街道', { location: '116.470000,39.995000', radius: 5000 });
+    expect(urls[0].pathname).toBe('/v3/place/around');
+    expect(Object.fromEntries(urls[0].searchParams)).toMatchObject({
+      location: '116.470000,39.995000', radius: '5000', types: '120302', page: '2'
+    });
+    expect(urls[0].searchParams.has('keywords')).toBe(false);
+    expect(page.candidates.map((value) => value.providerPoiId)).toEqual(['inside']);
+
+    const district = await fetchAmapDistrict('110105', 'secret', async () => Response.json({ status: '1', districts: [{
+      name: '朝阳区', center: '116.443,39.921', districts: [{ name: '望京街道', center: '116.47,39.995' }, { name: '无坐标', center: '' }]
+    }] }));
+    expect(district).toEqual({ center: { longitude: 116.443, latitude: 39.921 },
+      townships: [{ name: '望京街道', longitude: 116.47, latitude: 39.995 }] });
+  });
+
+  it('builds broker Amap radius and district requests that the WAF does not block', () => {
+    const search = operationDefinitions['amap.place-search'];
+    const parameters = search.validate({ region: '110105', page: 1, subdivision: '望京街道', location: '116.470000,39.995000', radius: 5000 });
+    expect(new URL(search.request(parameters, 'k').url).pathname).toBe('/v5/place/around');
+    expect(new URL(search.fallbackRequest(parameters, 'k').url).pathname).toBe('/v3/place/around');
+    expect(search.validate({ region: '110105', page: 1, location: 'bad' })).toBeNull();
+    expect(search.validate({ region: '110105', page: 1, location: '116.47,39.99', radius: 60000 })).toBeNull();
+    const district = operationDefinitions['amap.district'];
+    const url = new URL(district.request(district.validate({ keywords: '110105' }), 'k').url);
+    expect([url.pathname, url.searchParams.get('subdistrict')]).toEqual(['/v3/config/district', '1']);
   });
 
   it('uses exact Amap residential type and district boundaries', async () => {
