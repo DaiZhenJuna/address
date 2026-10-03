@@ -697,16 +697,33 @@ export const createAdminApi = ({
 
   app.get('/admin/api/settings/translation', async (context) => context.json({ data: {
     googleTranslationEnabled: Boolean(await control.setting('google_translation_enabled', true)),
+    googleTranslationConcurrency: Number(await control.setting('google_translation_concurrency', 1)),
     routes: await control.translationRoutes()
   } }));
   app.put('/admin/api/settings/translation', async (context) => {
-    const input = await context.req.json<{ googleTranslationEnabled?: unknown }>();
-    if (typeof input.googleTranslationEnabled !== 'boolean') return context.json({ error: 'INVALID_TRANSLATION_CONFIG' }, 400);
-    const googleRoute = (await control.translationRoutes()).find((route) => route.provider === 'google');
-    if (googleRoute) await control.updateTranslationRoutes([{ id: googleRoute.id, priority: googleRoute.priority, enabled: input.googleTranslationEnabled }]);
-    await control.setSetting('google_translation_enabled', input.googleTranslationEnabled);
-    await control.audit('admin', 'settings.translation.update', 'translation', { googleTranslationEnabled: input.googleTranslationEnabled });
-    return context.json({ data: { googleTranslationEnabled: input.googleTranslationEnabled, routes: await control.translationRoutes() } });
+    const input = await context.req.json<{ googleTranslationEnabled?: unknown; googleTranslationConcurrency?: unknown }>();
+    const hasEnabled = input.googleTranslationEnabled !== undefined;
+    const hasConcurrency = input.googleTranslationConcurrency !== undefined;
+    if ((!hasEnabled && !hasConcurrency) || (hasEnabled && typeof input.googleTranslationEnabled !== 'boolean')
+      || (hasConcurrency && !(Number.isInteger(input.googleTranslationConcurrency)
+        && Number(input.googleTranslationConcurrency) >= 1 && Number(input.googleTranslationConcurrency) <= 50))) {
+      return context.json({ error: 'INVALID_TRANSLATION_CONFIG' }, 400);
+    }
+    if (hasEnabled) {
+      const googleRoute = (await control.translationRoutes()).find((route) => route.provider === 'google');
+      if (googleRoute) await control.updateTranslationRoutes([{ id: googleRoute.id, priority: googleRoute.priority, enabled: Boolean(input.googleTranslationEnabled) }]);
+      await control.setSetting('google_translation_enabled', input.googleTranslationEnabled);
+    }
+    if (hasConcurrency) await control.setSetting('google_translation_concurrency', input.googleTranslationConcurrency);
+    await control.audit('admin', 'settings.translation.update', 'translation', {
+      ...(hasEnabled ? { googleTranslationEnabled: input.googleTranslationEnabled } : {}),
+      ...(hasConcurrency ? { googleTranslationConcurrency: input.googleTranslationConcurrency } : {})
+    });
+    return context.json({ data: {
+      googleTranslationEnabled: Boolean(await control.setting('google_translation_enabled', true)),
+      googleTranslationConcurrency: Number(await control.setting('google_translation_concurrency', 1)),
+      routes: await control.translationRoutes()
+    } });
   });
   app.put('/admin/api/settings/translation/routes', async (context) => {
     const input = await context.req.json<{ routes?: unknown }>().catch(() => ({ routes: undefined }));
