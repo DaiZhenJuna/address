@@ -334,6 +334,11 @@ export const createAdminApi = ({
   type AddressDataValue = Awaited<ReturnType<typeof listAddressData>>;
   let addressDataValue: AddressDataValue | undefined;
   let syncQueueValue: Record<string, unknown> | undefined;
+  // A stale read model is served while it refreshes only if it is recent; after a quiet period the caller waits,
+  // so counts never come from hours ago.
+  const STALE_READ_MODEL_MS = 120_000;
+  let addressDataValueAt = 0;
+  let syncQueueValueAt = 0;
   let addressDataSnapshot: { expiresAt: number; promise: Promise<AddressDataValue> } | undefined;
   let syncQueueSnapshot: { expiresAt: number; promise: Promise<Record<string, unknown>> } | undefined;
   const invalidateAdminReadModels = (): void => {
@@ -358,11 +363,12 @@ export const createAdminApi = ({
     addressDataSnapshot = { expiresAt: Number.POSITIVE_INFINITY, promise };
     void promise.then((value) => {
       addressDataValue = value;
+      addressDataValueAt = Date.now();
       if (addressDataSnapshot?.promise === promise) addressDataSnapshot.expiresAt = Date.now() + 10_000;
     }, () => {
       if (addressDataSnapshot?.promise === promise) addressDataSnapshot = undefined;
     });
-    return stale === undefined ? promise : Promise.resolve(stale);
+    return stale === undefined || Date.now() - addressDataValueAt > STALE_READ_MODEL_MS ? promise : Promise.resolve(stale);
   };
   const loadSyncQueueSnapshot = (): Promise<Record<string, unknown>> => {
     if (syncQueueSnapshot && syncQueueSnapshot.expiresAt > Date.now()) return syncQueueSnapshot.promise;
@@ -439,11 +445,13 @@ export const createAdminApi = ({
     syncQueueSnapshot = { expiresAt: Number.POSITIVE_INFINITY, promise };
     void promise.then((value) => {
       syncQueueValue = value;
+      syncQueueValueAt = Date.now();
       if (syncQueueSnapshot?.promise === promise) syncQueueSnapshot.expiresAt = Date.now() + 10_000;
     }, () => {
       if (syncQueueSnapshot?.promise === promise) syncQueueSnapshot = undefined;
     });
-    return stale === undefined || !stale.available ? promise : Promise.resolve(stale);
+    return stale === undefined || !stale.available || Date.now() - syncQueueValueAt > STALE_READ_MODEL_MS
+      ? promise : Promise.resolve(stale);
   };
 
   if (warmReadModels) queueMicrotask(() => {
@@ -1049,7 +1057,8 @@ export const createAccessApi = (control: ControlStore, {
       nodes,
       countries,
       metrics: {
-        countryCount: countries.filter((node) => node.residentialCount > 0).length,
+        countryCount: countries.length,
+        addressTotal: countries.reduce((total, node) => total + node.totalCount, 0),
         residentialTotal: countries.reduce((total, node) => total + node.residentialCount, 0),
         coveredLowest,
         totalLowest,
