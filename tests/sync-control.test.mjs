@@ -625,6 +625,63 @@ describe('address sync coordinator', () => {
     await expect(readFile(resolve(stateDir, 'sync.lock'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('recovers a lock left by a stopped container whose pid is alive in the new one', async () => {
+    const stateDir = testStateDir();
+    const jobsDir = resolve(stateDir, 'jobs');
+    const job = {
+      id: 'sync-old-container', trigger: 'queue', status: 'running', phase: 'import',
+      createdAt: '2026-07-16T03:00:00.000Z', startedAt: '2026-07-16T03:00:01.000Z', completedAt: null,
+      releaseId: null, shards: ['ES'], error: null
+    };
+    await mkdir(jobsDir, { recursive: true });
+    await writeFile(resolve(jobsDir, `${job.id}.json`), JSON.stringify(job));
+    await writeFile(resolve(stateDir, 'sync.lock'), JSON.stringify({ jobId: job.id, token: 'old', pid: 7, host: 'stopped-container' }));
+    const coordinator = new SyncCoordinator({
+      stateDir, runSync: async () => ({}), processIsAlive: () => true,
+      now: () => new Date('2026-07-16T03:01:00.000Z')
+    });
+    await coordinator.initialize();
+    await expect(coordinator.getJob(job.id)).resolves.toMatchObject({ status: 'failed', errorCode: 'SYNC_JOB_INTERRUPTED' });
+    await expect(readFile(resolve(stateDir, 'sync.lock'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('records the job of a stale lock it takes over as interrupted', async () => {
+    const stateDir = testStateDir();
+    const jobsDir = resolve(stateDir, 'jobs');
+    const job = {
+      id: 'sync-stale-owner', trigger: 'queue', status: 'running', phase: 'import',
+      createdAt: '2026-07-16T03:00:00.000Z', startedAt: '2026-07-16T03:00:01.000Z', completedAt: null,
+      releaseId: null, shards: ['ES'], error: null
+    };
+    await mkdir(jobsDir, { recursive: true });
+    await writeFile(resolve(jobsDir, `${job.id}.json`), JSON.stringify(job));
+    const coordinator = new SyncCoordinator({
+      stateDir, runSync: async () => ({}), processIsAlive: () => true, idFactory: () => 'next',
+      lockStaleMs: 1000, now: () => new Date(Date.now() + 60_000)
+    });
+    await coordinator.initialize();
+    await writeFile(resolve(stateDir, 'sync.lock'), JSON.stringify({ jobId: job.id, token: 'old', pid: 37 }));
+    await expect(coordinator.trigger('queue')).resolves.toMatchObject({ accepted: true });
+    await coordinator.waitForIdle();
+    await expect(coordinator.getJob(job.id)).resolves.toMatchObject({ status: 'failed', errorCode: 'SYNC_JOB_INTERRUPTED' });
+  });
+
+  it('records a shutdown interruption before exiting when the worker does not stop', async () => {
+    const fatal = vi.fn(() => { throw new Error('fixture supervisor restart'); });
+    const history = { queued: vi.fn(async () => {}), started: vi.fn(async () => {}), heartbeat: vi.fn(async () => {}), completed: vi.fn(async () => {}) };
+    const started = deferred();
+    const coordinator = new SyncCoordinator({
+      stateDir: testStateDir(), history, idFactory: () => 'job-shutdown-stuck', cancelGraceMs: 20, fatal,
+      runSync: async () => { started.resolve(); return new Promise(() => {}); }
+    });
+    const result = await coordinator.trigger('queue');
+    await started.promise;
+    await expect(coordinator.cancelActive()).resolves.toBe(false);
+    expect(history.completed).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed', errorCode: 'SYNC_JOB_INTERRUPTED' }));
+    expect(history.completed.mock.invocationCallOrder[0]).toBeLessThan(fatal.mock.invocationCallOrder[0]);
+    await expect(coordinator.getJob(result.job.id)).resolves.toMatchObject({ status: 'failed', errorCode: 'SYNC_JOB_INTERRUPTED' });
+  });
+
   it('quarantines a malformed lock and reconciles its interrupted job', async () => {
     const stateDir = testStateDir();
     const jobsDir = resolve(stateDir, 'jobs');
