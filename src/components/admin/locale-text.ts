@@ -63,7 +63,10 @@ const en = {
     source: 'Source', period: 'Time period', duration: 'Duration', growth: 'Address growth', trigger: 'Trigger',
     details: 'Details', empty: 'No synchronization history', queued: 'Queued', running: 'Running', succeeded: 'Execution succeeded',
     failed: 'Failed', paused_quota: 'Paused for quota', needs_review: 'Needs review', cancelled: 'Not executed', previous: 'Previous', next: 'Next',
-    candidates: 'Candidates', qualityPassed: 'Quality passed', rejected: 'Rejected', coveredNodes: 'Covered nodes', qualifiedNodes: 'Qualified nodes', interrupted: 'Interrupted', keptRows: 'Kept {count} published rows that passed quality checks'
+    candidates: 'Candidates', qualityPassed: 'Quality passed', rejected: 'Rejected', coveredNodes: 'Covered nodes', qualifiedNodes: 'Qualified nodes', interrupted: 'Interrupted', keptRows: 'Kept {count} published rows that passed quality checks',
+    inProgress: 'In progress', chinaProviders: 'China map providers',
+    phases: { discover: 'Source discovery', download: 'Download', materialize: 'Data preparation', import: 'Import', coverage: 'Coverage statistics', postcode: 'Postcode inference', publish: 'Publication' },
+    errors: { interrupted: 'Interrupted by a restart or deployment; requeued automatically', timeout: 'Exceeded the processing time limit', stuck: 'Worker did not stop in time after cancellation', databaseTimeout: 'Database statement timed out', databaseLock: 'Database lock wait timed out', database: 'Database error', quality: 'Failed the quality gates', partial: 'Partially completed; progress saved', credential: 'Key or quota unavailable', source: 'Source unavailable or returned invalid data', failed: 'Synchronization failed ({code})' }
   }
 };
 
@@ -133,7 +136,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: '占用时间段', duration: '持续时间', growth: '总量净增', trigger: '触发方式', details: '结果说明',
       empty: '暂无同步历史', queued: '排队中', running: '同步中', succeeded: '执行成功', failed: '失败',
       paused_quota: '等待额度', needs_review: '需要检查', cancelled: '未执行', previous: '上一页', next: '下一页',
-      candidates: '候选', qualityPassed: '质量通过', rejected: '拒绝', coveredNodes: '覆盖节点', qualifiedNodes: '达标节点', interrupted: '已中断', keptRows: '已保留 {count} 条已通过质量校验的地址'
+      candidates: '候选', qualityPassed: '质量通过', rejected: '拒绝', coveredNodes: '覆盖节点', qualifiedNodes: '达标节点', interrupted: '已中断', keptRows: '已保留 {count} 条已通过质量校验的地址',
+      inProgress: '进行中', chinaProviders: '中国地图服务商',
+      phases: { discover: '发现数据源', download: '下载', materialize: '数据准备', import: '导入', coverage: '覆盖统计', postcode: '邮编推断', publish: '发布' },
+      errors: { interrupted: '因重启或部署中断，已自动重新排队', timeout: '超过处理时间上限', stuck: '取消后工作进程未及时停止', databaseTimeout: '数据库语句超时', databaseLock: '数据库锁等待超时', database: '数据库错误', quality: '未通过质量门禁', partial: '部分完成，进度已保存', credential: '密钥或额度不可用', source: '数据源不可用或返回异常', failed: '同步失败（{code}）' }
     }
   },
   'zh-TW': {
@@ -198,7 +204,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: '佔用時段', duration: '持續時間', growth: '總量淨增', trigger: '觸發方式', details: '結果說明',
       empty: '暫無同步歷史', queued: '排隊中', running: '同步中', succeeded: '執行成功', failed: '失敗',
       paused_quota: '等待額度', needs_review: '需要檢查', cancelled: '未執行', previous: '上一頁', next: '下一頁',
-      candidates: '候選', qualityPassed: '品質通過', rejected: '拒絕', coveredNodes: '覆蓋節點', qualifiedNodes: '達標節點', interrupted: '已中斷', keptRows: '已保留 {count} 筆已通過品質校驗的地址'
+      candidates: '候選', qualityPassed: '品質通過', rejected: '拒絕', coveredNodes: '覆蓋節點', qualifiedNodes: '達標節點', interrupted: '已中斷', keptRows: '已保留 {count} 筆已通過品質校驗的地址',
+      inProgress: '進行中', chinaProviders: '中國地圖服務商',
+      phases: { discover: '探索資料來源', download: '下載', materialize: '資料準備', import: '匯入', coverage: '覆蓋統計', postcode: '郵遞區號推斷', publish: '發布' },
+      errors: { interrupted: '因重新啟動或部署中斷，已自動重新排隊', timeout: '超過處理時間上限', stuck: '取消後工作程序未及時停止', databaseTimeout: '資料庫語句逾時', databaseLock: '資料庫鎖定等待逾時', database: '資料庫錯誤', quality: '未通過品質門檻', partial: '部分完成，進度已儲存', credential: '金鑰或額度無法使用', source: '資料來源無法使用或回傳異常', failed: '同步失敗（{code}）' }
     }
   },
   ja: {
@@ -263,7 +272,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: '実行期間', duration: '所要時間', growth: '純増数', trigger: 'トリガー', details: '結果',
       empty: '同期履歴はありません', queued: '待機中', running: '実行中', succeeded: '成功', failed: '失敗',
       paused_quota: 'クォータ待ち', needs_review: '要確認', cancelled: '未実行', previous: '前へ', next: '次へ',
-      candidates: '候補', qualityPassed: '品質合格', rejected: '除外', coveredNodes: '網羅ノード', qualifiedNodes: '基準達成ノード', interrupted: '中断', keptRows: '品質チェック済みの {count} 件を保持'
+      candidates: '候補', qualityPassed: '品質合格', rejected: '除外', coveredNodes: '網羅ノード', qualifiedNodes: '基準達成ノード', interrupted: '中断', keptRows: '品質チェック済みの {count} 件を保持',
+      inProgress: '実行中', chinaProviders: '中国の地図サービス',
+      phases: { discover: 'データソースの検出', download: 'ダウンロード', materialize: 'データ準備', import: 'インポート', coverage: 'カバレッジ集計', postcode: '郵便番号推定', publish: '公開' },
+      errors: { interrupted: '再起動またはデプロイで中断され、自動で再キューされました', timeout: '処理時間の上限を超えました', stuck: 'キャンセル後にワーカーが時間内に停止しませんでした', databaseTimeout: 'データベースのステートメントがタイムアウトしました', databaseLock: 'データベースのロック待ちがタイムアウトしました', database: 'データベースエラー', quality: '品質ゲートを通過しませんでした', partial: '一部完了し、進捗を保存しました', credential: 'キーまたは利用枠を使用できません', source: 'データソースが利用できないか異常な応答を返しました', failed: '同期に失敗しました（{code}）' }
     }
   },
   ko: {
@@ -328,7 +340,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: '실행 기간', duration: '소요 시간', growth: '순증가', trigger: '트리거', details: '결과',
       empty: '동기화 기록이 없습니다', queued: '대기 중', running: '실행 중', succeeded: '성공', failed: '실패',
       paused_quota: '할당량 대기', needs_review: '검토 필요', cancelled: '실행 안 됨', previous: '이전', next: '다음',
-      candidates: '후보', qualityPassed: '품질 통과', rejected: '제외', coveredNodes: '커버 노드', qualifiedNodes: '기준 충족 노드', interrupted: '중단됨', keptRows: '품질 검사를 통과한 {count}건 유지'
+      candidates: '후보', qualityPassed: '품질 통과', rejected: '제외', coveredNodes: '커버 노드', qualifiedNodes: '기준 충족 노드', interrupted: '중단됨', keptRows: '품질 검사를 통과한 {count}건 유지',
+      inProgress: '진행 중', chinaProviders: '중국 지도 서비스',
+      phases: { discover: '데이터 소스 탐색', download: '다운로드', materialize: '데이터 준비', import: '가져오기', coverage: '커버리지 집계', postcode: '우편번호 추정', publish: '게시' },
+      errors: { interrupted: '재시작 또는 배포로 중단되어 자동으로 다시 대기열에 추가됨', timeout: '처리 시간 한도 초과', stuck: '취소 후 작업자가 제때 멈추지 않음', databaseTimeout: '데이터베이스 문 실행 시간 초과', databaseLock: '데이터베이스 잠금 대기 시간 초과', database: '데이터베이스 오류', quality: '품질 기준 미통과', partial: '일부 완료, 진행 상황 저장됨', credential: '키 또는 할당량 사용 불가', source: '데이터 소스를 사용할 수 없거나 비정상 응답', failed: '동기화 실패({code})' }
     }
   },
   de: {
@@ -393,7 +408,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: 'Zeitraum', duration: 'Dauer', growth: 'Adresszuwachs', trigger: 'Auslöser', details: 'Ergebnis',
       empty: 'Kein Synchronisierungsverlauf', queued: 'In Warteschlange', running: 'Läuft', succeeded: 'Erfolgreich', failed: 'Fehlgeschlagen',
       paused_quota: 'Pausiert (Kontingent)', needs_review: 'Prüfung nötig', cancelled: 'Nicht ausgeführt', previous: 'Zurück', next: 'Weiter',
-      candidates: 'Kandidaten', qualityPassed: 'Qualität bestanden', rejected: 'Abgelehnt', coveredNodes: 'Abgedeckte Knoten', qualifiedNodes: 'Qualifizierte Knoten', interrupted: 'Unterbrochen', keptRows: '{count} geprüfte Adressen behalten'
+      candidates: 'Kandidaten', qualityPassed: 'Qualität bestanden', rejected: 'Abgelehnt', coveredNodes: 'Abgedeckte Knoten', qualifiedNodes: 'Qualifizierte Knoten', interrupted: 'Unterbrochen', keptRows: '{count} geprüfte Adressen behalten',
+      inProgress: 'Läuft', chinaProviders: 'Kartendienste China',
+      phases: { discover: 'Quellensuche', download: 'Download', materialize: 'Datenaufbereitung', import: 'Import', coverage: 'Abdeckungsstatistik', postcode: 'Postleitzahlen-Ableitung', publish: 'Veröffentlichung' },
+      errors: { interrupted: 'Durch Neustart oder Deployment unterbrochen; automatisch neu eingereiht', timeout: 'Bearbeitungszeitlimit überschritten', stuck: 'Worker stoppte nach dem Abbruch nicht rechtzeitig', databaseTimeout: 'Datenbankanweisung hat das Zeitlimit überschritten', databaseLock: 'Warten auf Datenbanksperre hat das Zeitlimit überschritten', database: 'Datenbankfehler', quality: 'Qualitätsprüfung nicht bestanden', partial: 'Teilweise abgeschlossen; Fortschritt gespeichert', credential: 'Schlüssel oder Kontingent nicht verfügbar', source: 'Quelle nicht verfügbar oder ungültige Daten', failed: 'Synchronisierung fehlgeschlagen ({code})' }
     }
   },
   fr: {
@@ -458,7 +476,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: 'Période', duration: 'Durée', growth: 'Croissance des adresses', trigger: 'Déclencheur', details: 'Résultat',
       empty: 'Aucun historique de synchronisation', queued: 'En file', running: 'En cours', succeeded: 'Réussi', failed: 'Échec',
       paused_quota: 'En pause (quota)', needs_review: 'À vérifier', cancelled: 'Non exécuté', previous: 'Précédent', next: 'Suivant',
-      candidates: 'Candidats', qualityPassed: 'Qualité validée', rejected: 'Rejetés', coveredNodes: 'Nœuds couverts', qualifiedNodes: 'Nœuds conformes', interrupted: 'Interrompu', keptRows: '{count} adresses validées conservées'
+      candidates: 'Candidats', qualityPassed: 'Qualité validée', rejected: 'Rejetés', coveredNodes: 'Nœuds couverts', qualifiedNodes: 'Nœuds conformes', interrupted: 'Interrompu', keptRows: '{count} adresses validées conservées',
+      inProgress: 'En cours', chinaProviders: 'Services cartographiques chinois',
+      phases: { discover: 'Découverte de la source', download: 'Téléchargement', materialize: 'Préparation des données', import: 'Import', coverage: 'Statistiques de couverture', postcode: 'Déduction des codes postaux', publish: 'Publication' },
+      errors: { interrupted: 'Interrompu par un redémarrage ou un déploiement ; remis en file automatiquement', timeout: 'Durée maximale de traitement dépassée', stuck: 'Le processus ne s’est pas arrêté à temps après l’annulation', databaseTimeout: 'Délai de requête de la base de données dépassé', databaseLock: 'Délai d’attente de verrou de la base de données dépassé', database: 'Erreur de base de données', quality: 'Contrôles qualité non réussis', partial: 'Partiellement terminé ; progression enregistrée', credential: 'Clé ou quota indisponible', source: 'Source indisponible ou données invalides', failed: 'Échec de la synchronisation ({code})' }
     }
   },
   es: {
@@ -523,7 +544,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: 'Periodo', duration: 'Duración', growth: 'Crecimiento de direcciones', trigger: 'Disparador', details: 'Resultado',
       empty: 'Sin historial de sincronización', queued: 'En cola', running: 'En curso', succeeded: 'Completado', failed: 'Fallido',
       paused_quota: 'En pausa por cuota', needs_review: 'Requiere revisión', cancelled: 'No ejecutado', previous: 'Anterior', next: 'Siguiente',
-      candidates: 'Candidatos', qualityPassed: 'Calidad superada', rejected: 'Rechazados', coveredNodes: 'Nodos cubiertos', qualifiedNodes: 'Nodos que cumplen', interrupted: 'Interrumpido', keptRows: 'Se conservaron {count} direcciones validadas'
+      candidates: 'Candidatos', qualityPassed: 'Calidad superada', rejected: 'Rechazados', coveredNodes: 'Nodos cubiertos', qualifiedNodes: 'Nodos que cumplen', interrupted: 'Interrumpido', keptRows: 'Se conservaron {count} direcciones validadas',
+      inProgress: 'En curso', chinaProviders: 'Servicios de mapas de China',
+      phases: { discover: 'Descubrimiento de la fuente', download: 'Descarga', materialize: 'Preparación de datos', import: 'Importación', coverage: 'Estadísticas de cobertura', postcode: 'Inferencia de códigos postales', publish: 'Publicación' },
+      errors: { interrupted: 'Interrumpido por un reinicio o despliegue; reencolado automáticamente', timeout: 'Se superó el tiempo máximo de procesamiento', stuck: 'El proceso no se detuvo a tiempo tras la cancelación', databaseTimeout: 'Se agotó el tiempo de la consulta a la base de datos', databaseLock: 'Se agotó la espera de bloqueo de la base de datos', database: 'Error de base de datos', quality: 'No superó los controles de calidad', partial: 'Completado parcialmente; progreso guardado', credential: 'Clave o cupo no disponible', source: 'Fuente no disponible o datos no válidos', failed: 'Error de sincronización ({code})' }
     }
   },
   pt: {
@@ -588,7 +612,10 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       period: 'Período', duration: 'Duração', growth: 'Crescimento de endereços', trigger: 'Gatilho', details: 'Resultado',
       empty: 'Sem histórico de sincronização', queued: 'Na fila', running: 'Em execução', succeeded: 'Concluído', failed: 'Falhou',
       paused_quota: 'Pausado por cota', needs_review: 'Requer revisão', cancelled: 'Não executado', previous: 'Anterior', next: 'Próximo',
-      candidates: 'Candidatos', qualityPassed: 'Qualidade aprovada', rejected: 'Rejeitados', coveredNodes: 'Nós cobertos', qualifiedNodes: 'Nós qualificados', interrupted: 'Interrompido', keptRows: '{count} endereços validados mantidos'
+      candidates: 'Candidatos', qualityPassed: 'Qualidade aprovada', rejected: 'Rejeitados', coveredNodes: 'Nós cobertos', qualifiedNodes: 'Nós qualificados', interrupted: 'Interrompido', keptRows: '{count} endereços validados mantidos',
+      inProgress: 'Em andamento', chinaProviders: 'Serviços de mapas da China',
+      phases: { discover: 'Descoberta da fonte', download: 'Download', materialize: 'Preparação dos dados', import: 'Importação', coverage: 'Estatísticas de cobertura', postcode: 'Inferência de CEP', publish: 'Publicação' },
+      errors: { interrupted: 'Interrompido por reinício ou implantação; recolocado na fila automaticamente', timeout: 'Tempo máximo de processamento excedido', stuck: 'O processo não parou a tempo após o cancelamento', databaseTimeout: 'Tempo da consulta ao banco de dados esgotado', databaseLock: 'Tempo de espera de bloqueio do banco de dados esgotado', database: 'Erro de banco de dados', quality: 'Não passou nos controles de qualidade', partial: 'Concluído parcialmente; progresso salvo', credential: 'Chave ou cota indisponível', source: 'Fonte indisponível ou dados inválidos', failed: 'Falha na sincronização ({code})' }
     }
   }
 };

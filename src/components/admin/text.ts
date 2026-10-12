@@ -430,11 +430,27 @@ export const syncHistoryGoalChange = (item: SyncHistoryItem, locale: AdminLocale
   }
   return changes.join(' · ');
 };
+// Raw worker messages are English and may name server paths, so the table shows a localized category instead.
+const syncErrorKind = (code: string, message: string): keyof typeof syncHistoryBase.errors => {
+  if (/^(?:SYNC_JOB_INTERRUPTED|SYNC_PROCESS_ABORTED|SYNC_JOB_CANCELLED)$/u.test(code)) return 'interrupted';
+  if (code === 'SYNC_WORKER_STUCK') return 'stuck';
+  if (code === '57014') return 'databaseTimeout';
+  if (code === '55P03') return 'databaseLock';
+  if (/^\d[0-9A-Z]{4}$/u.test(code)) return 'database';
+  if (/TIMEOUT/u.test(`${code} ${message}`)) return 'timeout';
+  if (/QUALITY/u.test(code)) return 'quality';
+  if (code.startsWith('SOURCE_PARTIAL')) return 'partial';
+  if (/CREDENTIAL|QUOTA|RATE_LIMITED|REQUEST_BUDGET/u.test(code)) return 'credential';
+  if (/^(?:SOURCE_|CHINA_SYNC_SOURCE)/u.test(code)) return 'source';
+  return 'failed';
+};
 export const syncHistoryResultDetail = (item: SyncHistoryItem, locale: AdminLocale): string => {
   const text = syncHistoryText[locale];
   if (item.errorMessage || item.errorCode) {
     const kept = item.status === 'failed' && (item.netGrowth || 0) > 0 ? interpolate(text.keptRows, { count: '+' + item.netGrowth!.toLocaleString(locale) }) : '';
-    return [kept, [item.failurePhase, item.errorMessage || item.errorCode].filter(Boolean).join(' · ')].filter(Boolean).join(' · ');
+    const phase = text.phases[item.failurePhase as keyof typeof text.phases] || '';
+    const failure = interpolate(text.errors[syncErrorKind(item.errorCode || '', item.errorMessage || '')], { code: item.errorCode || '-' });
+    return [kept, phase, failure].filter(Boolean).join(' · ');
   }
   const parts: string[] = [];
   if (item.candidateCount !== null && item.candidateCount !== undefined) parts.push(`${text.candidates} ${item.candidateCount.toLocaleString(locale)}`);
