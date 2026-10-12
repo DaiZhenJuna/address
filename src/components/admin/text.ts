@@ -220,55 +220,55 @@ export const blacklistCategoryLabels: Record<AdminLocale, Record<string, string>
     government: '政府机构', military_law_justice: '军事与司法', education_research: '教育与科研',
     healthcare_care: '医疗与照护', finance: '金融机构', fire_utilities: '消防与公共设施',
     transport_logistics: '交通与物流', religious_funeral_public: '宗教与公共场馆',
-    hospitality_commercial_industrial: '住宿、商业与工业'
+    hospitality_commercial_industrial: '住宿、商业与工业', localCommerce: '本地商铺与服务'
   },
   en: {
     government: 'Government', military_law_justice: 'Military and justice', education_research: 'Education and research',
     healthcare_care: 'Healthcare and care', finance: 'Finance', fire_utilities: 'Fire and utilities',
     transport_logistics: 'Transport and logistics', religious_funeral_public: 'Religious and public venues',
-    hospitality_commercial_industrial: 'Hospitality, commercial, and industrial'
+    hospitality_commercial_industrial: 'Hospitality, commercial, and industrial', localCommerce: 'Local shops and services'
   },
   'zh-TW': {
     government: '政府機構', military_law_justice: '軍事與司法', education_research: '教育與研究',
     healthcare_care: '醫療與照護', finance: '金融機構', fire_utilities: '消防與公共設施',
     transport_logistics: '交通與物流', religious_funeral_public: '宗教與公共場館',
-    hospitality_commercial_industrial: '住宿、商業與工業'
+    hospitality_commercial_industrial: '住宿、商業與工業', localCommerce: '在地商店與服務'
   },
   ja: {
     government: '政府機関', military_law_justice: '軍事・司法', education_research: '教育・研究',
     healthcare_care: '医療・介護', finance: '金融機関', fire_utilities: '消防・公共設備',
     transport_logistics: '交通・物流', religious_funeral_public: '宗教・公共施設',
-    hospitality_commercial_industrial: '宿泊・商業・工業'
+    hospitality_commercial_industrial: '宿泊・商業・工業', localCommerce: '地域の店舗・サービス'
   },
   ko: {
     government: '정부 기관', military_law_justice: '군사 및 사법', education_research: '교육 및 연구',
     healthcare_care: '의료 및 돌봄', finance: '금융 기관', fire_utilities: '소방 및 공공시설',
     transport_logistics: '교통 및 물류', religious_funeral_public: '종교 및 공공시설',
-    hospitality_commercial_industrial: '숙박, 상업 및 산업'
+    hospitality_commercial_industrial: '숙박, 상업 및 산업', localCommerce: '지역 상점 및 서비스'
   },
   de: {
     government: 'Behörden', military_law_justice: 'Militär und Justiz', education_research: 'Bildung und Forschung',
     healthcare_care: 'Gesundheit und Pflege', finance: 'Finanzwesen', fire_utilities: 'Feuerwehr und Versorgung',
     transport_logistics: 'Verkehr und Logistik', religious_funeral_public: 'Religiöse und öffentliche Einrichtungen',
-    hospitality_commercial_industrial: 'Gastgewerbe, Handel und Industrie'
+    hospitality_commercial_industrial: 'Gastgewerbe, Handel und Industrie', localCommerce: 'Lokale Geschäfte und Dienste'
   },
   fr: {
     government: 'Administrations', military_law_justice: 'Armée et justice', education_research: 'Éducation et recherche',
     healthcare_care: 'Santé et soins', finance: 'Finance', fire_utilities: 'Pompiers et services publics',
     transport_logistics: 'Transport et logistique', religious_funeral_public: 'Lieux religieux et publics',
-    hospitality_commercial_industrial: 'Hébergement, commerce et industrie'
+    hospitality_commercial_industrial: 'Hébergement, commerce et industrie', localCommerce: 'Commerces et services de proximité'
   },
   es: {
     government: 'Organismos públicos', military_law_justice: 'Ejército y justicia', education_research: 'Educación e investigación',
     healthcare_care: 'Sanidad y cuidados', finance: 'Finanzas', fire_utilities: 'Bomberos y servicios públicos',
     transport_logistics: 'Transporte y logística', religious_funeral_public: 'Centros religiosos y públicos',
-    hospitality_commercial_industrial: 'Hostelería, comercio e industria'
+    hospitality_commercial_industrial: 'Hostelería, comercio e industria', localCommerce: 'Comercios y servicios locales'
   },
   pt: {
     government: 'Órgãos públicos', military_law_justice: 'Forças armadas e justiça', education_research: 'Educação e pesquisa',
     healthcare_care: 'Saúde e cuidados', finance: 'Finanças', fire_utilities: 'Bombeiros e serviços públicos',
     transport_logistics: 'Transportes e logística', religious_funeral_public: 'Locais religiosos e públicos',
-    hospitality_commercial_industrial: 'Hotelaria, comércio e indústria'
+    hospitality_commercial_industrial: 'Hotelaria, comércio e indústria', localCommerce: 'Comércio e serviços locais'
   }
 };
 export const providerQuotaDefaults: Record<string, number> = {

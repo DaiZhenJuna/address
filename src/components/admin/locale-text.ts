@@ -45,9 +45,9 @@ const en = {
     youdao: 'Youdao is usage-based and may charge after trial credits run out, including tests and automatic translation. Project limits are not free-credit guarantees. Do not add or enable credentials unless you accept the charges.'
   },
   deepl: {
-    notice: 'DeepL API Free only; never switches to Pro. The lower of the account allowance and project cap applies. All DeepL keys share one project character ledger. The test button checks usage without translating.',
+    notice: 'DeepL API Free only; never switches to Pro. The lower of the account allowance and project cap applies. Each key keeps its own character ledger. The test button checks usage without translating.',
     budget: 'Character cap (current quota period)', characters: 'characters', provider: 'Account used / limit', observed: 'Usage checked', unknown: 'Usage not checked',
-    reset: 'Provider reset date unavailable; usage is not cleared at calendar month boundaries.', add: 'Add DeepL key'
+    reset: 'DeepL Free reports no reset date; a key starts over when DeepL reports lower account usage, and exhausted keys are rechecked hourly.', add: 'Add DeepL key'
   },
   test: {"title": "Test connection", "mode": "Test mode", "modeChat": "Connectivity (send \"hi\")", "modeTranslate": "Address translation", "start": "Testing credential", "running": "Waiting for the provider…", "passed": "Test passed", "failed": "Test failed", "retry": "Retry", "model": "Model", "prompt": "Prompt", "addressSample": "address sample", "endpointProbe": "detected on save", "endpointPreview": "Request URL", "restoreDefaultPrompt": "Restore default prompt", "steps": {"invalidConfig": "The saved configuration is invalid", "endpoint": "Endpoint", "model": "Model", "parameters": "Parameters", "sendTranslation": "Sending address sample", "sendChat": "Sending test message", "timeout": "Request timed out", "network": "Network error", "status": "Connected", "providerError": "Provider error", "invalidJson": "Response is not JSON", "respondedModel": "Responding model", "finishReason": "Finish reason", "usage": "Token usage", "reasoning": "Reasoning characters", "response": "Response", "done": "Test completed", "truncated": "Output was truncated before the JSON finished; increase the output budget", "invalidTranslation": "The reply is not the expected JSON translations array", "translations": "Parsed translations", "identifiersChanged": "The model changed numbers or identifiers"}},
   shortcut: {
@@ -115,9 +115,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: '有道按量收费，试用额度用完后可能扣费，测试和自动翻译也可能产生费用。项目限额不代表供应商免费额度；若不接受费用，请勿添加或启用凭据。'
     },
     deepl: {
-      notice: '仅支持 DeepL API Free，不切换付费版。以账户实际额度和项目上限中较小者为准；所有 DeepL 密钥共用项目字符账本。测试按钮只查询额度，不消耗翻译字符。',
+      notice: '仅支持 DeepL API Free，不切换付费版。以账户实际额度和项目上限中较小者为准；每个密钥单独计算字符用量。测试按钮只查询额度，不消耗翻译字符。',
       budget: '字符使用上限（当前额度周期）', characters: '字符', provider: '账户已用 / 上限', observed: '额度查询时间', unknown: '尚未查询额度',
-      reset: '供应商未提供重置日期，不按月初清零。', add: '添加 DeepL 密钥'
+      reset: 'DeepL 免费版不提供重置日期；DeepL 报告的账户用量下降时重新计数，额度用完的密钥每小时复查一次。', add: '添加 DeepL 密钥'
     },
     test: {"title": "测试连接", "mode": "测试模式", "modeChat": "连通性（发送 \"hi\"）", "modeTranslate": "地址翻译", "start": "开始测试凭据", "running": "等待供应商响应…", "passed": "测试通过", "failed": "测试失败", "retry": "重试", "model": "模型", "prompt": "提示词", "addressSample": "地址样例", "endpointProbe": "保存时自动探测", "endpointPreview": "实际请求地址", "restoreDefaultPrompt": "恢复默认提示词", "steps": {"invalidConfig": "已保存的配置无效", "endpoint": "请求地址", "model": "模型", "parameters": "参数", "sendTranslation": "发送地址样例", "sendChat": "发送测试消息", "timeout": "请求超时", "network": "网络错误", "status": "已连接", "providerError": "供应商返回错误", "invalidJson": "响应不是 JSON", "respondedModel": "响应模型", "finishReason": "结束原因", "usage": "Token 用量", "reasoning": "思考内容字数", "response": "响应", "done": "测试完成", "truncated": "输出在 JSON 结束前被截断，请调大输出预算", "invalidTranslation": "回复不是约定的 JSON 翻译数组", "translations": "解析出的译文", "identifiersChanged": "模型改动了数字或编号"}},
     shortcut: {
@@ -180,9 +180,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: '有道按量收費，試用額度用完後可能扣費，測試和自動翻譯也可能產生費用。專案限額不代表供應商免費額度；若不接受費用，請勿新增或啟用憑據。'
     },
     deepl: {
-      notice: '僅支援 DeepL API Free，不切換付費版。以帳戶實際額度和專案上限中較小者為準；所有 DeepL 金鑰共用專案字元帳本。測試按鈕僅查詢額度，不消耗翻譯字元。',
+      notice: '僅支援 DeepL API Free，不切換付費版。以帳戶實際額度和專案上限中較小者為準；每個金鑰單獨計算字元用量。測試按鈕僅查詢額度，不消耗翻譯字元。',
       budget: '字元使用上限（目前額度週期）', characters: '字元', provider: '帳戶已用 / 上限', observed: '額度查詢時間', unknown: '尚未查詢額度',
-      reset: '供應商未提供重置日期，不按月初歸零。', add: '新增 DeepL 金鑰'
+      reset: 'DeepL 免費版不提供重置日期；DeepL 回報的帳戶用量下降時重新計數，額度用完的金鑰每小時複查一次。', add: '新增 DeepL 金鑰'
     },
     test: {"title": "測試連線", "mode": "測試模式", "modeChat": "連通性（傳送 \"hi\"）", "modeTranslate": "地址翻譯", "start": "開始測試憑據", "running": "等待供應商回應…", "passed": "測試通過", "failed": "測試失敗", "retry": "重試", "model": "模型", "prompt": "提示詞", "addressSample": "地址樣例", "endpointProbe": "儲存時自動偵測", "endpointPreview": "實際請求網址", "restoreDefaultPrompt": "恢復預設提示詞", "steps": {"invalidConfig": "已儲存的設定無效", "endpoint": "請求網址", "model": "模型", "parameters": "參數", "sendTranslation": "傳送地址樣例", "sendChat": "傳送測試訊息", "timeout": "請求逾時", "network": "網路錯誤", "status": "已連線", "providerError": "供應商回傳錯誤", "invalidJson": "回應不是 JSON", "respondedModel": "回應模型", "finishReason": "結束原因", "usage": "Token 用量", "reasoning": "思考內容字數", "response": "回應", "done": "測試完成", "truncated": "輸出在 JSON 結束前被截斷，請調大輸出預算", "invalidTranslation": "回覆不是約定的 JSON 翻譯陣列", "translations": "解析出的譯文", "identifiersChanged": "模型改動了數字或編號"}},
     shortcut: {
@@ -245,9 +245,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: 'Youdao は従量課金で、試用クレジットを使い切るとテストや自動翻訳でも料金が発生する場合があります。プロジェクトの上限は無料枠を保証するものではありません。料金を受け入れない場合は、認証情報を追加・有効化しないでください。'
     },
     deepl: {
-      notice: 'DeepL API Free のみ対応し、Pro には切り替えません。アカウントの利用枠とプロジェクト上限のうち小さい方が適用されます。すべての DeepL キーで 1 つの文字数台帳を共有します。テストボタンは利用状況を確認するだけで翻訳は行いません。',
+      notice: 'DeepL API Free のみ対応し、Pro には切り替えません。アカウントの利用枠とプロジェクト上限のうち小さい方が適用されます。文字数台帳はキーごとに管理します。テストボタンは利用状況を確認するだけで翻訳は行いません。',
       budget: '文字数上限（現在の利用期間）', characters: '文字', provider: 'アカウント使用量 / 上限', observed: '利用状況の確認時刻', unknown: '利用状況は未確認',
-      reset: 'プロバイダーがリセット日を提供していないため、月初にはリセットされません。', add: 'DeepL キーを追加'
+      reset: 'DeepL Free はリセット日を返しません。DeepL が報告する利用量が減ると再計算し、上限に達したキーは 1 時間ごとに再確認します。', add: 'DeepL キーを追加'
     },
     test: {"title": "接続テスト", "mode": "テストモード", "modeChat": "疎通確認（\"hi\" を送信）", "modeTranslate": "住所の翻訳", "start": "認証情報をテスト中", "running": "プロバイダーの応答を待っています…", "passed": "テスト成功", "failed": "テスト失敗", "retry": "再試行", "model": "モデル", "prompt": "プロンプト", "addressSample": "住所サンプル", "endpointProbe": "保存時に自動検出", "endpointPreview": "リクエスト URL", "restoreDefaultPrompt": "既定のプロンプトに戻す", "steps": {"invalidConfig": "保存された設定が無効です", "endpoint": "エンドポイント", "model": "モデル", "parameters": "パラメーター", "sendTranslation": "住所サンプルを送信", "sendChat": "テストメッセージを送信", "timeout": "タイムアウトしました", "network": "ネットワークエラー", "status": "接続済み", "providerError": "プロバイダーのエラー", "invalidJson": "応答が JSON ではありません", "respondedModel": "応答したモデル", "finishReason": "終了理由", "usage": "トークン使用量", "reasoning": "推論の文字数", "response": "応答", "done": "テスト完了", "truncated": "JSON の途中で出力が打ち切られました。出力上限を増やしてください", "invalidTranslation": "応答が想定した JSON 翻訳配列ではありません", "translations": "解析した訳文", "identifiersChanged": "モデルが数字や識別子を変更しました"}},
     shortcut: {
@@ -310,9 +310,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: 'Youdao는 사용량 기반 요금이며 체험 크레딧 소진 후에는 테스트와 자동 번역에도 요금이 발생할 수 있습니다. 프로젝트 한도는 무료 크레딧을 보장하지 않습니다. 요금을 받아들이지 않으면 자격 증명을 추가하거나 사용하지 마세요.'
     },
     deepl: {
-      notice: 'DeepL API Free만 지원하며 Pro로 전환하지 않습니다. 계정 허용량과 프로젝트 한도 중 작은 값이 적용되고, 모든 DeepL 키가 하나의 문자 사용 장부를 공유합니다. 테스트 버튼은 번역 없이 사용량만 확인합니다.',
+      notice: 'DeepL API Free만 지원하며 Pro로 전환하지 않습니다. 계정 허용량과 프로젝트 한도 중 작은 값이 적용되고, 문자 사용 장부는 키마다 따로 관리합니다. 테스트 버튼은 번역 없이 사용량만 확인합니다.',
       budget: '문자 한도(현재 할당 기간)', characters: '자', provider: '계정 사용량 / 한도', observed: '사용량 확인 시각', unknown: '사용량 미확인',
-      reset: '공급자가 초기화 날짜를 제공하지 않아 월초에 초기화되지 않습니다.', add: 'DeepL 키 추가'
+      reset: 'DeepL Free는 초기화 날짜를 제공하지 않습니다. DeepL이 보고한 계정 사용량이 줄면 다시 계산하며, 한도에 도달한 키는 1시간마다 다시 확인합니다.', add: 'DeepL 키 추가'
     },
     test: {"title": "연결 테스트", "mode": "테스트 모드", "modeChat": "연결 확인(\"hi\" 전송)", "modeTranslate": "주소 번역", "start": "자격 증명 테스트 시작", "running": "공급자 응답 대기 중…", "passed": "테스트 통과", "failed": "테스트 실패", "retry": "다시 시도", "model": "모델", "prompt": "프롬프트", "addressSample": "주소 샘플", "endpointProbe": "저장 시 자동 감지", "endpointPreview": "요청 URL", "restoreDefaultPrompt": "기본 프롬프트 복원", "steps": {"invalidConfig": "저장된 설정이 올바르지 않습니다", "endpoint": "엔드포인트", "model": "모델", "parameters": "매개변수", "sendTranslation": "주소 샘플 전송", "sendChat": "테스트 메시지 전송", "timeout": "요청 시간 초과", "network": "네트워크 오류", "status": "연결됨", "providerError": "공급자 오류", "invalidJson": "응답이 JSON이 아닙니다", "respondedModel": "응답 모델", "finishReason": "종료 사유", "usage": "토큰 사용량", "reasoning": "추론 글자 수", "response": "응답", "done": "테스트 완료", "truncated": "JSON이 끝나기 전에 출력이 잘렸습니다. 출력 예산을 늘리세요", "invalidTranslation": "응답이 약속된 JSON 번역 배열이 아닙니다", "translations": "파싱된 번역", "identifiersChanged": "모델이 숫자나 식별자를 변경했습니다"}},
     shortcut: {
@@ -375,9 +375,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: 'Youdao wird nach Nutzung abgerechnet und kann nach Ablauf des Testguthabens Kosten verursachen, auch für Tests und automatische Übersetzung. Projektlimits garantieren kein Freikontingent. Fügen Sie Zugangsdaten nur hinzu oder aktivieren Sie sie, wenn Sie die Kosten akzeptieren.'
     },
     deepl: {
-      notice: 'Nur DeepL API Free; es wird nie zu Pro gewechselt. Es gilt der kleinere Wert aus Kontokontingent und Projektlimit. Alle DeepL-Schlüssel teilen sich ein Zeichenkonto. Die Testtaste prüft nur die Nutzung und übersetzt nichts.',
+      notice: 'Nur DeepL API Free; es wird nie zu Pro gewechselt. Es gilt der kleinere Wert aus Kontokontingent und Projektlimit. Jeder Schlüssel führt ein eigenes Zeichenkonto. Die Testtaste prüft nur die Nutzung und übersetzt nichts.',
       budget: 'Zeichenlimit (aktueller Zeitraum)', characters: 'Zeichen', provider: 'Konto genutzt / Limit', observed: 'Nutzung geprüft', unknown: 'Nutzung nicht geprüft',
-      reset: 'Der Anbieter nennt kein Rücksetzdatum; die Nutzung wird nicht zum Monatsanfang zurückgesetzt.', add: 'DeepL-Schlüssel hinzufügen'
+      reset: 'DeepL Free nennt kein Rücksetzdatum; sinkt die von DeepL gemeldete Kontonutzung, beginnt die Zählung neu, und ausgeschöpfte Schlüssel werden stündlich geprüft.', add: 'DeepL-Schlüssel hinzufügen'
     },
     test: {"title": "Verbindung testen", "mode": "Testmodus", "modeChat": "Erreichbarkeit („hi“ senden)", "modeTranslate": "Adressübersetzung", "start": "Zugangsdaten werden getestet", "running": "Warten auf den Anbieter…", "passed": "Test bestanden", "failed": "Test fehlgeschlagen", "retry": "Erneut versuchen", "model": "Modell", "prompt": "Prompt", "addressSample": "Adressbeispiel", "endpointProbe": "wird beim Speichern erkannt", "endpointPreview": "Anfrage-URL", "restoreDefaultPrompt": "Standard-Prompt wiederherstellen", "steps": {"invalidConfig": "Die gespeicherte Konfiguration ist ungültig", "endpoint": "Endpunkt", "model": "Modell", "parameters": "Parameter", "sendTranslation": "Adressbeispiel wird gesendet", "sendChat": "Testnachricht wird gesendet", "timeout": "Zeitüberschreitung", "network": "Netzwerkfehler", "status": "Verbunden", "providerError": "Fehler des Anbieters", "invalidJson": "Antwort ist kein JSON", "respondedModel": "Antwortendes Modell", "finishReason": "Abschlussgrund", "usage": "Token-Verbrauch", "reasoning": "Reasoning-Zeichen", "response": "Antwort", "done": "Test abgeschlossen", "truncated": "Die Ausgabe wurde vor dem Ende des JSON abgeschnitten; erhöhen Sie das Ausgabebudget", "invalidTranslation": "Die Antwort ist nicht das erwartete JSON-Übersetzungsarray", "translations": "Erkannte Übersetzungen", "identifiersChanged": "Das Modell hat Zahlen oder Kennungen verändert"}},
     shortcut: {
@@ -440,9 +440,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: 'Youdao est facturé à l’usage et peut entraîner des frais après épuisement des crédits d’essai, y compris pour les tests et la traduction automatique. Les limites du projet ne garantissent aucun crédit gratuit. N’ajoutez ni n’activez d’identifiants si vous n’acceptez pas ces frais.'
     },
     deepl: {
-      notice: 'DeepL API Free uniquement ; aucun passage à Pro. La plus faible valeur entre l’allocation du compte et la limite du projet s’applique. Toutes les clés DeepL partagent un même registre de caractères. Le bouton de test vérifie l’usage sans traduire.',
+      notice: 'DeepL API Free uniquement ; aucun passage à Pro. La plus faible valeur entre l’allocation du compte et la limite du projet s’applique. Chaque clé tient son propre registre de caractères. Le bouton de test vérifie l’usage sans traduire.',
       budget: 'Plafond de caractères (période en cours)', characters: 'caractères', provider: 'Compte utilisé / limite', observed: 'Usage vérifié', unknown: 'Usage non vérifié',
-      reset: 'Le fournisseur n’indique pas de date de réinitialisation ; l’usage n’est pas remis à zéro en début de mois.', add: 'Ajouter une clé DeepL'
+      reset: 'DeepL Free n’indique pas de date de réinitialisation ; le décompte repart quand l’usage signalé par DeepL baisse, et les clés épuisées sont revérifiées toutes les heures.', add: 'Ajouter une clé DeepL'
     },
     test: {"title": "Tester la connexion", "mode": "Mode de test", "modeChat": "Connectivité (envoi de « hi »)", "modeTranslate": "Traduction d’adresse", "start": "Test de l’identifiant", "running": "En attente du fournisseur…", "passed": "Test réussi", "failed": "Échec du test", "retry": "Réessayer", "model": "Modèle", "prompt": "Invite", "addressSample": "exemple d’adresse", "endpointProbe": "détecté à l’enregistrement", "endpointPreview": "URL de requête", "restoreDefaultPrompt": "Rétablir l’invite par défaut", "steps": {"invalidConfig": "La configuration enregistrée est invalide", "endpoint": "Point de terminaison", "model": "Modèle", "parameters": "Paramètres", "sendTranslation": "Envoi de l’exemple d’adresse", "sendChat": "Envoi du message de test", "timeout": "Délai dépassé", "network": "Erreur réseau", "status": "Connecté", "providerError": "Erreur du fournisseur", "invalidJson": "La réponse n’est pas du JSON", "respondedModel": "Modèle ayant répondu", "finishReason": "Motif de fin", "usage": "Consommation de jetons", "reasoning": "Caractères de raisonnement", "response": "Réponse", "done": "Test terminé", "truncated": "La sortie a été tronquée avant la fin du JSON ; augmentez le budget de sortie", "invalidTranslation": "La réponse n’est pas le tableau JSON de traductions attendu", "translations": "Traductions analysées", "identifiersChanged": "Le modèle a modifié des nombres ou des identifiants"}},
     shortcut: {
@@ -505,9 +505,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: 'Youdao se factura por uso y puede cobrar al agotarse los créditos de prueba, incluidas las pruebas y la traducción automática. Los límites del proyecto no garantizan créditos gratuitos. No añada ni active credenciales si no acepta los cargos.'
     },
     deepl: {
-      notice: 'Solo DeepL API Free; nunca cambia a Pro. Se aplica el menor entre el cupo de la cuenta y el límite del proyecto. Todas las claves de DeepL comparten un mismo registro de caracteres. El botón de prueba consulta el uso sin traducir.',
+      notice: 'Solo DeepL API Free; nunca cambia a Pro. Se aplica el menor entre el cupo de la cuenta y el límite del proyecto. Cada clave lleva su propio registro de caracteres. El botón de prueba consulta el uso sin traducir.',
       budget: 'Límite de caracteres (periodo actual)', characters: 'caracteres', provider: 'Cuenta usada / límite', observed: 'Uso consultado', unknown: 'Uso no consultado',
-      reset: 'El proveedor no indica la fecha de restablecimiento; el uso no se reinicia a principio de mes.', add: 'Añadir clave de DeepL'
+      reset: 'DeepL Free no indica la fecha de restablecimiento; el recuento se reinicia cuando DeepL informa un uso menor y las claves agotadas se revisan cada hora.', add: 'Añadir clave de DeepL'
     },
     test: {"title": "Probar conexión", "mode": "Modo de prueba", "modeChat": "Conectividad (enviar \"hi\")", "modeTranslate": "Traducción de direcciones", "start": "Probando la credencial", "running": "Esperando al proveedor…", "passed": "Prueba superada", "failed": "Prueba fallida", "retry": "Reintentar", "model": "Modelo", "prompt": "Prompt", "addressSample": "muestra de dirección", "endpointProbe": "se detecta al guardar", "endpointPreview": "URL de solicitud", "restoreDefaultPrompt": "Restablecer prompt predeterminado", "steps": {"invalidConfig": "La configuración guardada no es válida", "endpoint": "Endpoint", "model": "Modelo", "parameters": "Parámetros", "sendTranslation": "Enviando muestra de dirección", "sendChat": "Enviando mensaje de prueba", "timeout": "Tiempo de espera agotado", "network": "Error de red", "status": "Conectado", "providerError": "Error del proveedor", "invalidJson": "La respuesta no es JSON", "respondedModel": "Modelo que respondió", "finishReason": "Motivo de finalización", "usage": "Uso de tokens", "reasoning": "Caracteres de razonamiento", "response": "Respuesta", "done": "Prueba completada", "truncated": "La salida se cortó antes de terminar el JSON; aumente el presupuesto de salida", "invalidTranslation": "La respuesta no es el array JSON de traducciones esperado", "translations": "Traducciones analizadas", "identifiersChanged": "El modelo cambió números o identificadores"}},
     shortcut: {
@@ -570,9 +570,9 @@ export const localeText: Record<AdminLocale, LocaleText> = {
       youdao: 'O Youdao é cobrado por uso e pode gerar cobranças após o fim dos créditos de teste, inclusive em testes e tradução automática. Os limites do projeto não garantem créditos gratuitos. Não adicione nem ative credenciais se não aceitar as cobranças.'
     },
     deepl: {
-      notice: 'Apenas DeepL API Free; nunca muda para Pro. Vale o menor entre a franquia da conta e o limite do projeto. Todas as chaves DeepL compartilham um único registro de caracteres. O botão de teste consulta o uso sem traduzir.',
+      notice: 'Apenas DeepL API Free; nunca muda para Pro. Vale o menor entre a franquia da conta e o limite do projeto. Cada chave mantém seu próprio registro de caracteres. O botão de teste consulta o uso sem traduzir.',
       budget: 'Limite de caracteres (período atual)', characters: 'caracteres', provider: 'Conta usada / limite', observed: 'Uso consultado', unknown: 'Uso não consultado',
-      reset: 'O provedor não informa a data de redefinição; o uso não é zerado no início do mês.', add: 'Adicionar chave DeepL'
+      reset: 'O DeepL Free não informa a data de redefinição; a contagem recomeça quando o DeepL informa um uso menor e as chaves esgotadas são verificadas a cada hora.', add: 'Adicionar chave DeepL'
     },
     test: {"title": "Testar conexão", "mode": "Modo de teste", "modeChat": "Conectividade (enviar \"hi\")", "modeTranslate": "Tradução de endereços", "start": "Testando a credencial", "running": "Aguardando o provedor…", "passed": "Teste aprovado", "failed": "Teste falhou", "retry": "Tentar novamente", "model": "Modelo", "prompt": "Prompt", "addressSample": "amostra de endereço", "endpointProbe": "detectado ao salvar", "endpointPreview": "URL da requisição", "restoreDefaultPrompt": "Restaurar prompt padrão", "steps": {"invalidConfig": "A configuração salva é inválida", "endpoint": "Endpoint", "model": "Modelo", "parameters": "Parâmetros", "sendTranslation": "Enviando amostra de endereço", "sendChat": "Enviando mensagem de teste", "timeout": "Tempo esgotado", "network": "Erro de rede", "status": "Conectado", "providerError": "Erro do provedor", "invalidJson": "A resposta não é JSON", "respondedModel": "Modelo que respondeu", "finishReason": "Motivo de término", "usage": "Uso de tokens", "reasoning": "Caracteres de raciocínio", "response": "Resposta", "done": "Teste concluído", "truncated": "A saída foi cortada antes do fim do JSON; aumente o orçamento de saída", "invalidTranslation": "A resposta não é o array JSON de traduções esperado", "translations": "Traduções analisadas", "identifiersChanged": "O modelo alterou números ou identificadores"}},
     shortcut: {
