@@ -590,6 +590,9 @@ CREATE INDEX IF NOT EXISTS idx_cn_communities_city_random ON cn_communities_v2(c
 CREATE INDEX IF NOT EXISTS idx_cn_communities_province_random ON cn_communities_v2(province,active,((hashtextextended(id,0) & 2147483647)),id);
 CREATE INDEX IF NOT EXISTS idx_cn_communities_district_random ON cn_communities_v2(district,active,((hashtextextended(id,0) & 2147483647)),id);
 CREATE INDEX IF NOT EXISTS idx_cn_communities_postcode_random ON cn_communities_v2(postcode,active,((hashtextextended(id,0) & 2147483647)),id);
+CREATE STATISTICS IF NOT EXISTS cn_communities_location_stats (dependencies, mcv) ON province, city, district FROM cn_communities_v2;
+CREATE STATISTICS IF NOT EXISTS cn_communities_city_stats (dependencies, mcv) ON province, city FROM cn_communities_v2;
+ALTER STATISTICS cn_communities_city_stats SET STATISTICS 1000;
 CREATE INDEX IF NOT EXISTS idx_cn_community_sources_community ON cn_community_sources(community_id);
 CREATE INDEX IF NOT EXISTS idx_cn_ingest_decision ON cn_ingest_candidates(decision,provider,adcode,last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_cn_ingest_location ON cn_ingest_candidates(city,district,decision);
@@ -695,5 +698,5 @@ CREATE TABLE IF NOT EXISTS address_postcode_inference (
 );
 
 INSERT INTO schema_migrations(version, applied_at)
-SELECT version, CURRENT_TIMESTAMP::text FROM generate_series(1, 33) AS version
+SELECT version, CURRENT_TIMESTAMP::text FROM generate_series(1, 35) AS version
 ON CONFLICT (version) DO NOTHING;

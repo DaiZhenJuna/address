@@ -13,7 +13,7 @@ import { translationRoutesSchema } from '../translation/routing.mjs';
 const { Pool } = pg;
 const addressSchemaUrl = new URL('./schema.sql', import.meta.url);
 const controlSchemaUrl = new URL('../control/schema.sql', import.meta.url);
-const ADDRESS_SCHEMA_VERSION = 33;
+const ADDRESS_SCHEMA_VERSION = 35;
 const CONTROL_SCHEMA_VERSION = 28;
 
 const integer = (value, fallback, minimum, maximum) => {
@@ -25,7 +25,9 @@ const databaseClosedError = () => Object.assign(new Error('PostgreSQL database i
 const postgresOptions = (environment) => {
   const base = environment.POSTGRES_OPTIONS || '-c search_path=address,control,public';
   const workers = integer(environment.POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER, 0, 0, 16);
-  return `${base} -c max_parallel_workers_per_gather=${workers}`;
+  // Compiling grouping and count queries cost more CPU than it saved on this workload.
+  const jit = environment.POSTGRES_JIT === 'on' ? 'on' : 'off';
+  return `${base} -c max_parallel_workers_per_gather=${workers} -c jit=${jit}`;
 };
 
 export const postgresPoolOptions = (environment = process.env) => ({
@@ -176,6 +178,11 @@ const canonicalIndexState = async (client) => {
 // Location filters group one country's published rows; the covering index keeps that an index-only scan.
 const generationLocationIndexSql = `CREATE INDEX IF NOT EXISTS idx_generation_location_groups ON address.address_generation_index
   (country_code,admin1_key,admin1_code_key,locality_key,postal_locality_key) INCLUDE (residential_ready,postcode_key) WHERE active=1`;
+
+const chinaLocationStatisticsSql = `CREATE STATISTICS IF NOT EXISTS address.cn_communities_location_stats
+  (dependencies, mcv) ON province, city, district FROM address.cn_communities_v2`;
+const chinaCityStatisticsSql = `CREATE STATISTICS IF NOT EXISTS address.cn_communities_city_stats
+  (dependencies, mcv) ON province, city FROM address.cn_communities_v2`;
 
 const ensureConcurrentIndex = async (client, name, sql) => {
   const { rows: [index] } = await client.query(`SELECT index_state.indisvalid AS valid FROM pg_index index_state
@@ -337,7 +344,7 @@ export const initializePostgres = async (pool, {
       `);
       if (Number(versions.address_version) >= ADDRESS_SCHEMA_VERSION
         && Number(versions.control_version) >= CONTROL_SCHEMA_VERSION) return;
-      if ([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33].includes(Number(versions.address_version))
+      if ([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35].includes(Number(versions.address_version))
         && Number(versions.control_version) >= 19) {
         if (Number(versions.address_version) === 23) await upgradeStreetSchema(client, addressSource);
         if (Number(versions.address_version) < 25) await ensureActiveCountryCursorIndex(client);
@@ -354,6 +361,20 @@ export const initializePostgres = async (pool, {
         if (Number(versions.address_version) < 33) {
           await ensureConcurrentIndex(client, 'idx_generation_location_groups', generationLocationIndexSql);
           await client.query('INSERT INTO address.schema_migrations(version,applied_at) VALUES (33,CURRENT_TIMESTAMP::text) ON CONFLICT(version) DO NOTHING');
+        }
+        if (Number(versions.address_version) < 34) {
+          // Province, city and district are correlated; without joint statistics the planner underestimates large
+          // cities and reads every community instead of walking the random-key index.
+          await client.query(chinaLocationStatisticsSql);
+          await client.query('ANALYZE address.cn_communities_v2');
+          await client.query('INSERT INTO address.schema_migrations(version,applied_at) VALUES (34,CURRENT_TIMESTAMP::text) ON CONFLICT(version) DO NOTHING');
+        }
+        if (Number(versions.address_version) < 35) {
+          // The default target keeps only the most common combinations, so smaller cities were still estimated at one row.
+          await client.query(chinaCityStatisticsSql);
+          await client.query('ALTER STATISTICS address.cn_communities_city_stats SET STATISTICS 1000');
+          await client.query('ANALYZE address.cn_communities_v2');
+          await client.query('INSERT INTO address.schema_migrations(version,applied_at) VALUES (35,CURRENT_TIMESTAMP::text) ON CONFLICT(version) DO NOTHING');
         }
         await lockedTransaction(client, async () => {
           await client.query('SET LOCAL search_path TO address, public');
