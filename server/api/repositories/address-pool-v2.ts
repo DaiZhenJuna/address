@@ -735,46 +735,45 @@ export const pickNearestAddressPoolV2Address = async (
   now = new Date()
 ): Promise<NearestAddressPoolV2Result | undefined> => {
   if (!db) return undefined;
-  const clauses = [
-    'country_code = ?',
-    'active = 1',
-    'quality_score >= 0.7',
-    completenessClause(),
-    addressLocalizationSqlClause()
-  ];
-  const baseBindings: unknown[] = [country];
-  if (residential) clauses.push(`property_type IN ('residential','apartment')`, 'residential_evidence = 1');
+  const readiness = residential ? ' AND generation.residential_ready=1' : '';
   const longitudeScale = Math.max(0.1, Math.cos(coordinates.latitude * Math.PI / 180));
   // Every row inside the box is read and sorted, and a 25 km box in a dense city holds tens of thousands of rows,
-  // so the search widens step by step and stops at the first radius that has candidates.
+  // so the search widens step by step and stops at the first radius that has candidates. The box is searched on the
+  // pool's coordinate index and publishability comes from the generation index, which holds exactly the rows passing
+  // the publication clause; only the nearest rows are read through the runtime view.
   const radii = [...new Set([2, 8, 25, maximumDistanceKm].map((radius) => Math.min(radius, maximumDistanceKm)))].filter((radius) => radius > 0);
 
   try {
     for (const radiusKm of radii) {
       const latitudeRadius = radiusKm / 111.32;
       const longitudeRadius = Math.min(180, latitudeRadius / longitudeScale);
-      const coordinateFilter = 'latitude >= ? AND latitude <= ? AND longitude >= ? AND longitude <= ?';
-      const result = await db.prepare(`SELECT *,
-        ((latitude - ?) * (latitude - ?)) +
-        ((longitude - ?) * (longitude - ?) * ? * ?) AS distance_score
-        FROM address_pool_runtime
-        WHERE ${clauses.join(' AND ')}
-          AND ${coordinateFilter}
-        ORDER BY distance_score, random_key, id LIMIT 16`).bind(
+      const nearest = (await db.prepare(`SELECT pool.id,
+        ((pool.latitude - ?) * (pool.latitude - ?)) +
+        ((pool.longitude - ?) * (pool.longitude - ?) * ? * ?) AS distance_score
+        FROM address_pool pool
+        JOIN address_generation_index generation ON generation.address_id=pool.id AND generation.active=1${readiness}
+        WHERE pool.country_code = ? AND pool.active = 1
+          AND pool.latitude >= ? AND pool.latitude <= ? AND pool.longitude >= ? AND pool.longitude <= ?
+        ORDER BY distance_score, pool.random_key, pool.id LIMIT 16`).bind(
         coordinates.latitude,
         coordinates.latitude,
         coordinates.longitude,
         coordinates.longitude,
         longitudeScale,
         longitudeScale,
-        ...baseBindings,
+        country,
         Math.max(-90, coordinates.latitude - latitudeRadius),
         Math.min(90, coordinates.latitude + latitudeRadius),
         Math.max(-180, coordinates.longitude - longitudeRadius),
         Math.min(180, coordinates.longitude + longitudeRadius)
-      ).all<AddressPoolV2Row>();
-      const rows = result.results || [];
-      const candidates = rows.flatMap((row) => {
+      ).all<{ id: string }>()).results || [];
+      if (!nearest.length) continue;
+      const stored = new Map(((await db.prepare(`SELECT * FROM address_pool_runtime WHERE active = 1 AND id IN (${nearest.map(() => '?').join(',')})`)
+        .bind(...nearest.map(({ id }) => id)).all<AddressPoolV2Row>()).results || []).map((row) => [row.id, row]));
+      const candidates = nearest.flatMap(({ id }) => {
+        const row = stored.get(id);
+        if (!row || row.country_code !== country
+          || residential && (Number(row.residential_evidence) !== 1 || !['residential', 'apartment'].includes(row.property_type))) return [];
         const address = rowToAddress(row, now);
         return address ? [{ address, distanceKm: geographicDistanceKm(coordinates, address.coordinates) }] : [];
       }).filter((candidate) => candidate.distanceKm <= radiusKm);

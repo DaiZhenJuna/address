@@ -602,29 +602,29 @@ CREATE INDEX IF NOT EXISTS idx_sync_node_overrides_country ON sync_node_override
 CREATE INDEX IF NOT EXISTS idx_address_pool_coordinates
   ON address_pool(country_code,latitude,longitude) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_country_random
-  ON address_generation_index(country_code,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,random_key,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_country_residential_random
-  ON address_generation_index(country_code,residential_ready,active,random_key,address_id)
+  ON address_generation_index(country_code,random_key,address_id)
   WHERE active=1 AND residential_ready=1;
 ALTER TABLE address_generation_index ADD COLUMN IF NOT EXISTS country_rank BIGINT;
 ALTER TABLE address_generation_index ADD COLUMN IF NOT EXISTS residential_rank BIGINT;
 CREATE INDEX IF NOT EXISTS idx_generation_country_rank
-  ON address_generation_index(country_code,active,country_rank,address_id) WHERE active=1;
+  ON address_generation_index(country_code,country_rank,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_country_residential_rank
-  ON address_generation_index(country_code,residential_ready,active,residential_rank,address_id)
+  ON address_generation_index(country_code,residential_rank,address_id)
   WHERE active=1 AND residential_ready=1;
 CREATE INDEX IF NOT EXISTS idx_generation_admin1_random
-  ON address_generation_index(country_code,admin1_key,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,admin1_key,random_key,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_admin1_code_random
-  ON address_generation_index(country_code,admin1_code_key,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,admin1_code_key,random_key,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_locality_random
-  ON address_generation_index(country_code,locality_key,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,locality_key,random_key,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_postal_locality_random
-  ON address_generation_index(country_code,postal_locality_key,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,postal_locality_key,random_key,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_district_random
-  ON address_generation_index(country_code,district_key,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,district_key,random_key,address_id) WHERE active=1;
 CREATE INDEX IF NOT EXISTS idx_generation_postcode_random
-  ON address_generation_index(country_code,postcode_key,active,random_key,address_id) WHERE active=1;
+  ON address_generation_index(country_code,postcode_key,random_key,address_id) WHERE active=1;
 
 UPDATE catalog_regions SET native_name='Fryslân'
 WHERE country_code='NL' AND code='FR' AND native_name IN ('Frieland','Friesland');
@@ -698,5 +698,5 @@ CREATE TABLE IF NOT EXISTS address_postcode_inference (
 );
 
 INSERT INTO schema_migrations(version, applied_at)
-SELECT version, CURRENT_TIMESTAMP::text FROM generate_series(1, 35) AS version
+SELECT version, CURRENT_TIMESTAMP::text FROM generate_series(1, 36) AS version
 ON CONFLICT (version) DO NOTHING;

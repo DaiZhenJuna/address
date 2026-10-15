@@ -13,7 +13,7 @@ import { translationRoutesSchema } from '../translation/routing.mjs';
 const { Pool } = pg;
 const addressSchemaUrl = new URL('./schema.sql', import.meta.url);
 const controlSchemaUrl = new URL('../control/schema.sql', import.meta.url);
-const ADDRESS_SCHEMA_VERSION = 35;
+const ADDRESS_SCHEMA_VERSION = 36;
 const CONTROL_SCHEMA_VERSION = 28;
 
 const integer = (value, fallback, minimum, maximum) => {
@@ -202,6 +202,41 @@ const ensureConcurrentIndex = async (client, name, sql) => {
   }
 };
 
+// A partial index must not repeat its predicate columns as leading keys: the planner drops quals the predicate implies,
+// so the rank or random key after such a column could not bound the scan and one window read a whole country.
+const generationSelectionIndexes = [
+  ['idx_generation_country_random', '(country_code,random_key,address_id) WHERE active=1'],
+  ['idx_generation_country_residential_random', '(country_code,random_key,address_id) WHERE active=1 AND residential_ready=1'],
+  ['idx_generation_country_rank', '(country_code,country_rank,address_id) WHERE active=1'],
+  ['idx_generation_country_residential_rank', '(country_code,residential_rank,address_id) WHERE active=1 AND residential_ready=1'],
+  ...['admin1_key', 'admin1_code_key', 'locality_key', 'postal_locality_key', 'district_key', 'postcode_key'].map((column) => [
+    `idx_generation_${column.replace(/_key$/u, '')}_random`, `(country_code,${column},random_key,address_id) WHERE active=1`
+  ])
+];
+
+// Builds the new definition beside the old index and swaps names, so selection keeps an index throughout and a rerun
+// resumes after an interruption.
+const replaceGenerationIndex = async (client, name, definition) => {
+  const { rows: [current] } = await client.query(`SELECT pg_get_indexdef(relation.oid) AS definition,index_state.indisvalid AS valid
+    FROM pg_class relation JOIN pg_index index_state ON index_state.indexrelid=relation.oid
+    JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace
+    WHERE namespace.nspname='address' AND relation.relname=$1`, [name]);
+  const columns = definition.slice(0, definition.indexOf(')') + 1).replaceAll(',', ', ');
+  if (current?.valid && String(current.definition || '').includes(` USING btree ${columns} `)) return;
+  const next = `${name}_next`;
+  await ensureConcurrentIndex(client, next, `CREATE INDEX IF NOT EXISTS ${next} ON address.address_generation_index ${definition}`);
+  const settings = (await client.query("SELECT current_setting('statement_timeout') AS statement_timeout,current_setting('lock_timeout') AS lock_timeout")).rows[0];
+  try {
+    await client.query("SET statement_timeout TO '60min'");
+    await client.query("SET lock_timeout TO '0'");
+    if (current) await client.query(`DROP INDEX CONCURRENTLY IF EXISTS address.${name}`);
+    await client.query(`ALTER INDEX address.${next} RENAME TO ${name}`);
+  } finally {
+    await client.query("SELECT set_config('statement_timeout',$1,false),set_config('lock_timeout',$2,false)",
+      [settings?.statement_timeout, settings?.lock_timeout]);
+  }
+};
+
 const upgradePostcodeInferenceSchema = async (client) => {
   await client.query('BEGIN');
   try {
@@ -344,7 +379,7 @@ export const initializePostgres = async (pool, {
       `);
       if (Number(versions.address_version) >= ADDRESS_SCHEMA_VERSION
         && Number(versions.control_version) >= CONTROL_SCHEMA_VERSION) return;
-      if ([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35].includes(Number(versions.address_version))
+      if ([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36].includes(Number(versions.address_version))
         && Number(versions.control_version) >= 19) {
         if (Number(versions.address_version) === 23) await upgradeStreetSchema(client, addressSource);
         if (Number(versions.address_version) < 25) await ensureActiveCountryCursorIndex(client);
@@ -375,6 +410,10 @@ export const initializePostgres = async (pool, {
           await client.query('ALTER STATISTICS address.cn_communities_city_stats SET STATISTICS 1000');
           await client.query('ANALYZE address.cn_communities_v2');
           await client.query('INSERT INTO address.schema_migrations(version,applied_at) VALUES (35,CURRENT_TIMESTAMP::text) ON CONFLICT(version) DO NOTHING');
+        }
+        if (Number(versions.address_version) < 36) {
+          for (const [name, definition] of generationSelectionIndexes) await replaceGenerationIndex(client, name, definition);
+          await client.query('INSERT INTO address.schema_migrations(version,applied_at) VALUES (36,CURRENT_TIMESTAMP::text) ON CONFLICT(version) DO NOTHING');
         }
         await lockedTransaction(client, async () => {
           await client.query('SET LOCAL search_path TO address, public');
