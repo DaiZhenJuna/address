@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example v2.2.0
+        description: Release version, for example v2.3.0
         required: true
-        default: v2.2.0
+        default: v2.3.0
 
 permissions:
   contents: read
@@ -114,28 +114,30 @@ jobs:
         run: |
           version='${{ steps.version.outputs.value }}'
           cat > release/RELEASE_NOTES.md <<'NOTES'
-          ### Address data and sources
-          - Assigns missing districts and cities from official or open boundary polygons (COD-AB, IBGE, admdongkor, Overture divisions and others) without overwriting source values; low-volume countries use a city-level contract.
-          - Added a Nigeria Geofabrik extract, Brazil and Singapore Overture addresses, and US Overture state partitions with USA Structures residential evidence.
-          - Address rules follow local conventions: China publishes communities with road and house number optional, and an unverifiable postcode outside China is left empty instead of rejecting the address.
-          - Fills missing postcodes from Census ZCTA and ABS POA boundaries, unique GeoNames places, Taiwan township zones and the China district catalog, including province-administered districts.
-          - Rejects placeholder street names, conversational or transliterated Chinese translations, and source text whose characters were lost; rejected rows are retired for retranslation.
-          - Taiwan names use the official 臺 form; the China city catalog restores truncated names and moves Jiangsu cities filed under Taiwan back to Jiangsu.
+          ### Location selection
+          - Region and city options are built from the published addresses themselves: every published address is reachable from the dropdowns, option counts add up to the country total, and generating for an option returns exactly the addresses it counts.
+          - Region names match across scripts, administrative suffixes, accents and successor units (Vietnam's 2025 provincial merger); unrecognized regions are corrected from boundary polygons or nearby catalog cities, and the importer applies the same gate.
+          - Corrected machine-translated Chinese catalog names (reviewed corrections table), official Japanese prefecture names (東京都, 大阪府) and US territory labels.
 
-          ### Translation and publication
-          - Each provider credential has an adjustable concurrency, and translation backfill sends requests in parallel within each route's limit.
-          - Publication takes row locks only and updates generation ranks incrementally, so large backlogs publish about 90 times faster.
-          - Below-target countries are translated and published first; ordinary addresses publish before their Chinese street name is translated.
+          ### Address repair and quality
+          - Administrative-name repair runs per country with its own revision; it fixes region codes and names, city fields holding codes or numbers, and mixed-level countries checked against first-level polygons.
+          - Published rows that no longer pass the import gate are repaired or retired, so dropdown counts include only addressable rows; the full-pool quality audit blocks on invalid and unrecognized regions.
 
-          ### Synchronization and deployment
-          - Country targets up to one billion addresses, with a storage budget that stops at a 10 GiB free-disk floor.
-          - Sync history credits each run only with its own import; failed runs show no growth, and runs interrupted by a restart or deploy are recorded as interrupted instead of staying running.
-          - Large imports no longer time out: finalization writes only changed rows and an evidence index is built concurrently at startup.
-          - Production activation runs detached, waits for the running sync job, and removes images of pruned releases and stale build cache.
-          - The public generator renders the first address without a loading pass and serves country counts from the admin coverage snapshot.
+          ### Performance
+          - Generation selection indexes no longer lead with their partial-index predicate columns, so rank and random-key lookups use the index instead of scanning a whole country (seconds to milliseconds).
+          - China community picks query only the alias windows communities use, with joint province/city statistics (Xiamen from 1.5-3 s to about 20 ms server time).
+          - IP-region picks search the coordinate index and read only the nearest rows.
+          - Translation publication adjusts country counts by each batch's change instead of recounting the country, which could hit the statement timeout.
+          - Option snapshots memoize aliases, yield during builds and rebuild one at a time; app connections disable PostgreSQL JIT.
+
+          ### Admin
+          - Added the keyless Index-Translate route; credential tests show a testing state and floating success or failure notices.
+
+          ### Upgrade notes
+          - Schema migrations 34-36 run automatically: extended statistics on China communities and a concurrent, resumable rebuild of ten generation indexes (allow several minutes on large pools).
 
           ### Verification
-          - Verified 1,508 JavaScript/TypeScript tests, 108 Python tests, type checks, builds, and 500 live address-contract samples for each of the 27 supported countries.
+          - Verified 1,590 JavaScript/TypeScript tests, 113 Python tests, type checks, builds, the public-release audit, live API validation across all 27 countries, dropdown reachability for 26 countries and 500 live address-contract samples for China.
           NOTES
       - name: Publish stable GitHub release
         shell: bash
