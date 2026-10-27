@@ -320,7 +320,12 @@ describe('China community storage integration', () => {
     const prepare = vi.fn((_sql: string) => ({ bind }));
     await pickChinaCommunityAddress({ prepare } as never, { city: '厦门' }, 'nearby', { latitude: 24.48, longitude: 118.09 });
     expect(prepare.mock.calls[0][0]).toContain('community.city IN (');
-    expect(prepare.mock.calls[0][0]).toContain('source_count DESC,community.id LIMIT 500');
+    expect(prepare.mock.calls[0][0]).toContain('community.latitude BETWEEN ? AND ?');
+    expect(prepare.mock.calls[0][0]).toContain('community.id LIMIT 50');
+    // An empty area widens through every radius up to the 25 km limit.
+    expect(prepare).toHaveBeenCalledTimes(4);
+    expect(bind.mock.calls.map((values) => Math.round((Number(values.at(-9)) - Number(values.at(-10))) * 111.32 * 5) / 10))
+      .toEqual([0.5, 2, 8, 25]);
     expect(prepare.mock.calls[0][0]).not.toContain('UNION ALL');
   });
 

@@ -672,19 +672,19 @@ describe('ADDRESS_DB v2 repository', () => {
       database, 'JP', true, { latitude: 35.676, longitude: 139.642 }, 'widening', 25, new Date('2026-07-20T00:00:00Z')
     );
     expect(selected?.address.id).toBe('pool-v2-suburb');
-    expect(boxes.map(([south, north]) => Math.round((north - south) * 111.32 / 2))).toEqual([2, 8]);
+    expect(boxes.map(([south, north]) => Math.round((north - south) * 111.32 * 5) / 10)).toEqual([0.5, 2, 8]);
   });
 
-  it('searches the IP box through the generation index and reads only the nearest rows', async () => {
+  it('reads the IP box from the pool index and checks only its nearest rows against the generation index', async () => {
     const statements = [];
     const database = {
       prepare(sql) {
         const statement = {
           bind(...values) { statements.push({ sql, values }); return statement; },
           async all() {
-            return sql.includes('distance_score')
-              ? { results: [{ id: 'closest' }, { id: 'farther' }] }
-              : { results: [{ ...row, id: 'farther', latitude: 35.68, longitude: 139.642 }, { ...row, id: 'closest', latitude: 35.6761, longitude: 139.6421 }] };
+            if (sql.includes('distance_score')) return { results: [{ id: 'closest' }, { id: 'unpublished' }, { id: 'farther' }] };
+            if (sql.includes('address_generation_index')) return { results: [{ id: 'farther' }, { id: 'closest' }] };
+            return { results: [{ ...row, id: 'farther', latitude: 35.68, longitude: 139.642 }, { ...row, id: 'closest', latitude: 35.6761, longitude: 139.6421 }] };
           }
         };
         return statement;
@@ -693,11 +693,35 @@ describe('ADDRESS_DB v2 repository', () => {
     const selected = await pickNearestAddressPoolV2Address(
       database, 'JP', true, { latitude: 35.676, longitude: 139.642 }, 'index', 25, new Date('2026-07-20T00:00:00Z')
     );
-    expect(statements[0].sql).toContain('JOIN address_generation_index generation');
-    expect(statements[0].sql).toContain('generation.residential_ready=1');
-    expect(statements[0].sql).not.toContain('address_pool_runtime');
-    expect(statements[1].sql).toContain('address_pool_runtime WHERE active = 1 AND id IN (?,?)');
-    expect(statements[1].values).toEqual(['closest', 'farther']);
+    expect(statements[0].sql).not.toContain('address_generation_index');
+    expect(statements[0].sql).toContain("pool.property_type IN ('residential','apartment')");
+    expect(statements[1].sql).toContain('generation.residential_ready=1');
+    expect(statements[1].values).toEqual(['closest', 'unpublished', 'farther']);
+    expect(statements[2].sql).toContain('address_pool_runtime WHERE active = 1 AND id IN (?,?)');
+    expect(statements[2].values).toEqual(['closest', 'farther']);
     expect(['pool-v2-closest', 'pool-v2-farther']).toContain(selected?.address.id);
+  });
+
+  it('falls back to the whole box when its nearest rows are all unpublishable', async () => {
+    const statements = [];
+    const database = {
+      prepare(sql) {
+        const statement = {
+          bind(...values) { statements.push({ sql, values }); return statement; },
+          async all() {
+            if (sql.includes('JOIN address_generation_index')) return { results: [{ id: 'published' }] };
+            if (sql.includes('distance_score')) return { results: Array.from({ length: 64 }, (_, index) => ({ id: `hidden-${index}` })) };
+            if (sql.includes('address_generation_index')) return { results: [] };
+            return { results: [{ ...row, id: 'published', latitude: 35.6761, longitude: 139.6421 }] };
+          }
+        };
+        return statement;
+      }
+    };
+    const selected = await pickNearestAddressPoolV2Address(
+      database, 'JP', true, { latitude: 35.676, longitude: 139.642 }, 'fallback', 25, new Date('2026-07-20T00:00:00Z')
+    );
+    expect(statements[2].sql).toContain('JOIN address_generation_index generation');
+    expect(selected?.address.id).toBe('pool-v2-published');
   });
 });

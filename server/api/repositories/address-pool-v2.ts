@@ -757,36 +757,47 @@ export const pickNearestAddressPoolV2Address = async (
   if (!db) return undefined;
   const readiness = residential ? ' AND generation.residential_ready=1' : '';
   const longitudeScale = Math.max(0.1, Math.cos(coordinates.latitude * Math.PI / 180));
-  // Every row inside the box is read and sorted, and a 25 km box in a dense city holds tens of thousands of rows,
-  // so the search widens step by step and stops at the first radius that has candidates. The box is searched on the
-  // pool's coordinate index and publishability comes from the generation index, which holds exactly the rows passing
-  // the publication clause; only the nearest rows are read through the runtime view.
-  const radii = [...new Set([2, 8, 25, maximumDistanceKm].map((radius) => Math.min(radius, maximumDistanceKm)))].filter((radius) => radius > 0);
+  // Every row inside the box is read and sorted, so the search widens step by step and stops at the first radius with
+  // candidates; a 2 km box in a dense city holds thousands of rows. The box is read from the covering coordinate index
+  // alone, and only its nearest rows are checked against the generation index (which holds exactly the publishable
+  // rows) and read through the runtime view: one random read per box row took seconds on a cold cache.
+  const radii = [...new Set([0.5, 2, 8, 25, maximumDistanceKm].map((radius) => Math.min(radius, maximumDistanceKm)))].filter((radius) => radius > 0);
+  const boxLimit = 64;
+  // The pick is among the eight nearest publishable rows, so only those are read through the runtime view.
+  const pickLimit = 8;
+  const residentialTypes = residential ? ` AND pool.property_type IN ('residential','apartment')` : '';
+  const distance = `((pool.latitude - ?) * (pool.latitude - ?)) + ((pool.longitude - ?) * (pool.longitude - ?) * ? * ?)`;
 
   try {
     for (const radiusKm of radii) {
       const latitudeRadius = radiusKm / 111.32;
       const longitudeRadius = Math.min(180, latitudeRadius / longitudeScale);
-      const nearest = (await db.prepare(`SELECT pool.id,
-        ((pool.latitude - ?) * (pool.latitude - ?)) +
-        ((pool.longitude - ?) * (pool.longitude - ?) * ? * ?) AS distance_score
-        FROM address_pool pool
-        JOIN address_generation_index generation ON generation.address_id=pool.id AND generation.active=1${readiness}
-        WHERE pool.country_code = ? AND pool.active = 1
-          AND pool.latitude >= ? AND pool.latitude <= ? AND pool.longitude >= ? AND pool.longitude <= ?
-        ORDER BY distance_score, pool.random_key, pool.id LIMIT 16`).bind(
-        coordinates.latitude,
-        coordinates.latitude,
-        coordinates.longitude,
-        coordinates.longitude,
-        longitudeScale,
-        longitudeScale,
+      const box = [
+        coordinates.latitude, coordinates.latitude, coordinates.longitude, coordinates.longitude, longitudeScale, longitudeScale,
         country,
         Math.max(-90, coordinates.latitude - latitudeRadius),
         Math.min(90, coordinates.latitude + latitudeRadius),
         Math.max(-180, coordinates.longitude - longitudeRadius),
         Math.min(180, coordinates.longitude + longitudeRadius)
-      ).all<{ id: string }>()).results || [];
+      ];
+      const boxWhere = `pool.country_code = ? AND pool.active = 1
+          AND pool.latitude >= ? AND pool.latitude <= ? AND pool.longitude >= ? AND pool.longitude <= ?${residentialTypes}`;
+      const closest = (await db.prepare(`SELECT pool.id, pool.random_key, ${distance} AS distance_score
+        FROM address_pool pool WHERE ${boxWhere}
+        ORDER BY distance_score, pool.random_key, pool.id LIMIT ${boxLimit}`).bind(...box).all<{ id: string; random_key: number; distance_score: number }>()).results || [];
+      if (!closest.length) continue;
+      const ready = new Set(((await db.prepare(`SELECT generation.address_id AS id FROM address_generation_index generation
+        WHERE generation.active=1${readiness} AND generation.address_id IN (${closest.map(() => '?').join(',')})`)
+        .bind(...closest.map(({ id }) => id)).all<{ id: string }>()).results || []).map(({ id }) => id));
+      let nearest = closest.filter(({ id }) => ready.has(id)).slice(0, pickLimit);
+      // The nearest box rows are all unpublishable only rarely; the whole box then decides, as before.
+      if (!nearest.length && closest.length === boxLimit) {
+        nearest = (await db.prepare(`SELECT pool.id, ${distance} AS distance_score
+          FROM address_pool pool
+          JOIN address_generation_index generation ON generation.address_id=pool.id AND generation.active=1${readiness}
+          WHERE ${boxWhere}
+          ORDER BY distance_score, pool.random_key, pool.id LIMIT ${pickLimit}`).bind(...box).all<{ id: string; random_key: number; distance_score: number }>()).results || [];
+      }
       if (!nearest.length) continue;
       const stored = new Map(((await db.prepare(`SELECT * FROM address_pool_runtime WHERE active = 1 AND id IN (${nearest.map(() => '?').join(',')})`)
         .bind(...nearest.map(({ id }) => id)).all<AddressPoolV2Row>()).results || []).map((row) => [row.id, row]));
@@ -798,7 +809,7 @@ export const pickNearestAddressPoolV2Address = async (
         return address ? [{ address, distanceKm: geographicDistanceKm(coordinates, address.coordinates) }] : [];
       }).filter((candidate) => candidate.distanceKm <= radiusKm);
       if (candidates.length) {
-        const picked = candidates[hashSeed(`${country}:${seed}:ip-nearest`) % Math.min(8, candidates.length)];
+        const picked = candidates[hashSeed(`${country}:${seed}:ip-nearest`) % candidates.length];
         const address = await enrichPublishableAddress(db, picked.address);
         if (address) return { ...picked, address };
       }
