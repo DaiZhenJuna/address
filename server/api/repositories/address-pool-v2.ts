@@ -763,12 +763,14 @@ export const pickNearestAddressPoolV2Address = async (
   // rows) and read through the runtime view: one random read per box row took seconds on a cold cache.
   const radii = [...new Set([0.5, 2, 8, 25, maximumDistanceKm].map((radius) => Math.min(radius, maximumDistanceKm)))].filter((radius) => radius > 0);
   const boxLimit = 64;
-  // The pick is among the eight nearest publishable rows, so only those are read through the runtime view.
-  const pickLimit = 8;
+  // Repeated picks for one IP draw at random from the nearest publishable rows, so the box widens until it holds enough
+  // of them for variety; a pick among the eight nearest returned the same few addresses over and over.
+  const varietyTarget = 32;
   const residentialTypes = residential ? ` AND pool.property_type IN ('residential','apartment')` : '';
   const distance = `((pool.latitude - ?) * (pool.latitude - ?)) + ((pool.longitude - ?) * (pool.longitude - ?) * ? * ?)`;
 
   try {
+    let best: { ids: string[]; radiusKm: number } | undefined;
     for (const radiusKm of radii) {
       const latitudeRadius = radiusKm / 111.32;
       const longitudeRadius = Math.min(180, latitudeRadius / longitudeScale);
@@ -782,36 +784,47 @@ export const pickNearestAddressPoolV2Address = async (
       ];
       const boxWhere = `pool.country_code = ? AND pool.active = 1
           AND pool.latitude >= ? AND pool.latitude <= ? AND pool.longitude >= ? AND pool.longitude <= ?${residentialTypes}`;
-      const closest = (await db.prepare(`SELECT pool.id, pool.random_key, ${distance} AS distance_score
+      type BoxRow = { id: string; latitude: number; longitude: number };
+      const closest = (await db.prepare(`SELECT pool.id, pool.latitude, pool.longitude, ${distance} AS distance_score
         FROM address_pool pool WHERE ${boxWhere}
-        ORDER BY distance_score, pool.random_key, pool.id LIMIT ${boxLimit}`).bind(...box).all<{ id: string; random_key: number; distance_score: number }>()).results || [];
+        ORDER BY distance_score, pool.random_key, pool.id LIMIT ${boxLimit}`).bind(...box).all<BoxRow>()).results || [];
       if (!closest.length) continue;
       const ready = new Set(((await db.prepare(`SELECT generation.address_id AS id FROM address_generation_index generation
         WHERE generation.active=1${readiness} AND generation.address_id IN (${closest.map(() => '?').join(',')})`)
         .bind(...closest.map(({ id }) => id)).all<{ id: string }>()).results || []).map(({ id }) => id));
-      let nearest = closest.filter(({ id }) => ready.has(id)).slice(0, pickLimit);
+      let nearest = closest.filter(({ id }) => ready.has(id));
       // The nearest box rows are all unpublishable only rarely; the whole box then decides, as before.
       if (!nearest.length && closest.length === boxLimit) {
-        nearest = (await db.prepare(`SELECT pool.id, ${distance} AS distance_score
+        nearest = (await db.prepare(`SELECT pool.id, pool.latitude, pool.longitude, ${distance} AS distance_score
           FROM address_pool pool
           JOIN address_generation_index generation ON generation.address_id=pool.id AND generation.active=1${readiness}
           WHERE ${boxWhere}
-          ORDER BY distance_score, pool.random_key, pool.id LIMIT ${pickLimit}`).bind(...box).all<{ id: string; random_key: number; distance_score: number }>()).results || [];
+          ORDER BY distance_score, pool.random_key, pool.id LIMIT ${boxLimit}`).bind(...box).all<BoxRow>()).results || [];
       }
+      // The box corners lie beyond the radius.
+      nearest = nearest.filter((row) => geographicDistanceKm(coordinates, { latitude: Number(row.latitude), longitude: Number(row.longitude) }) <= radiusKm);
       if (!nearest.length) continue;
-      const stored = new Map(((await db.prepare(`SELECT * FROM address_pool_runtime WHERE active = 1 AND id IN (${nearest.map(() => '?').join(',')})`)
-        .bind(...nearest.map(({ id }) => id)).all<AddressPoolV2Row>()).results || []).map((row) => [row.id, row]));
-      const candidates = nearest.flatMap(({ id }) => {
+      best = { ids: nearest.map(({ id }) => id), radiusKm };
+      if (nearest.length >= varietyTarget) break;
+    }
+    if (!best) return undefined;
+    // A seeded order over the candidates; rows are read in small batches until one passes, usually the first.
+    const order = [...best.ids].sort((left, right) => hashSeed(`${seed}:ip-nearest:${left}`) - hashSeed(`${seed}:ip-nearest:${right}`)
+      || left.localeCompare(right));
+    for (let offset = 0; offset < order.length; offset += 8) {
+      const batch = order.slice(offset, offset + 8);
+      const stored = new Map(((await db.prepare(`SELECT * FROM address_pool_runtime WHERE active = 1 AND id IN (${batch.map(() => '?').join(',')})`)
+        .bind(...batch).all<AddressPoolV2Row>()).results || []).map((row) => [row.id, row]));
+      for (const id of batch) {
         const row = stored.get(id);
         if (!row || row.country_code !== country
-          || residential && (Number(row.residential_evidence) !== 1 || !['residential', 'apartment'].includes(row.property_type))) return [];
-        const address = rowToAddress(row, now);
-        return address ? [{ address, distanceKm: geographicDistanceKm(coordinates, address.coordinates) }] : [];
-      }).filter((candidate) => candidate.distanceKm <= radiusKm);
-      if (candidates.length) {
-        const picked = candidates[hashSeed(`${country}:${seed}:ip-nearest`) % candidates.length];
-        const address = await enrichPublishableAddress(db, picked.address);
-        if (address) return { ...picked, address };
+          || residential && (Number(row.residential_evidence) !== 1 || !['residential', 'apartment'].includes(row.property_type))) continue;
+        const candidate = rowToAddress(row, now);
+        if (!candidate) continue;
+        const distanceKm = geographicDistanceKm(coordinates, candidate.coordinates);
+        if (distanceKm > best.radiusKm) continue;
+        const address = await enrichPublishableAddress(db, candidate);
+        if (address) return { address, distanceKm };
       }
     }
     return undefined;

@@ -75,6 +75,7 @@ const communityDistanceKm = (left: { latitude: number; longitude: number }, righ
   return 6371 * 2 * Math.atan2(Math.sqrt(Math.min(1, Math.max(0, value))), Math.sqrt(Math.max(0, 1 - value)));
 };
 const MAX_COMMUNITY_DISTANCE_KM = 25;
+const COMMUNITY_VARIETY_TARGET = 16;
 const providerHome: Record<string, string> = {
   amap: 'https://www.amap.com/', baidu: 'https://map.baidu.com/', tencent: 'https://map.qq.com/'
 };
@@ -202,8 +203,8 @@ export const pickChinaCommunityAddress = async (
   ]);
   let rows: CommunityCandidateRow[] = [];
   if (coordinates) {
-    // The box widens until it holds a community and is read nearest first; a fixed ±1° box read every community of a
-    // metropolitan area to keep 500 by source count, which took seconds on a cold cache.
+    // The box widens until it holds enough communities for repeated picks to vary and is read nearest first; a fixed ±1°
+    // box read every community of a metropolitan area to keep 500 by source count, which took seconds on a cold cache.
     const longitudeScale = Math.max(0.1, Math.cos(coordinates.latitude * Math.PI / 180));
     for (const radiusKm of [0.5, 2, 8, MAX_COMMUNITY_DISTANCE_KM]) {
       const latitudeRadius = radiusKm / 111.32;
@@ -216,10 +217,9 @@ export const pickChinaCommunityAddress = async (
           coordinates.longitude - longitudeRadius, coordinates.longitude + longitudeRadius,
           coordinates.latitude, coordinates.latitude, coordinates.longitude, coordinates.longitude, longitudeScale, longitudeScale)
         .all<CommunityCandidateRow>()).results || [];
-      if (found.some((row) => allowed(row) && communityDistanceKm(coordinates, row) <= MAX_COMMUNITY_DISTANCE_KM)) {
-        rows = found;
-        break;
-      }
+      const usable = found.filter((row) => allowed(row) && communityDistanceKm(coordinates, row) <= radiusKm);
+      if (usable.length) rows = usable;
+      if (usable.length >= COMMUNITY_VARIETY_TARGET) break;
     }
   } else {
     const pivot = seedKey(`${seed}:china-community`);
@@ -255,7 +255,8 @@ export const pickChinaCommunityAddress = async (
       .map(({ row }) => row)
     : allowedRows;
   if (!coordinateRows.length) return undefined;
-  const selected = coordinates ? coordinateRows[0] : coordinateRows[seedIndex(`${seed}:candidate`, coordinateRows.length)];
+  // Repeated picks for one IP vary among the nearby communities instead of always returning the nearest.
+  const selected = coordinateRows[seedIndex(`${seed}:candidate`, coordinateRows.length)];
   const providers = await loadCommunityProviders(database, selected.id);
   return providers ? rowToAddress({ ...selected, providers }) : undefined;
 };

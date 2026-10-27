@@ -315,6 +315,23 @@ describe('China community storage integration', () => {
     expect(bind.mock.calls[1]).not.toContain('福建');
   });
 
+  it('varies repeated IP picks among the nearby communities', async () => {
+    const communities = Array.from({ length: 20 }, (_, index) => ({
+      id: `near-${index}`, canonical_name: `小区${index}`, provider_address: `文化路${index}号`, province: '江苏省', city: '南京市',
+      district: '玄武区', township: '', postcode: '210000', latitude: 32.06 + index / 100000, longitude: 118.79,
+      source_count: 1, verification_level: 'single-source', last_seen_at: '2026-10-01T00:00:00Z'
+    }));
+    const prepare = vi.fn((sql: string) => ({
+      bind: () => ({ all: async () => ({ results: sql.includes('SELECT DISTINCT provider') ? [{ provider: 'amap' }] : communities }) })
+    }));
+    const picks = new Set<string | undefined>();
+    for (let index = 0; index < 20; index += 1) {
+      picks.add((await pickChinaCommunityAddress({ prepare } as never, {}, `seed-${index}`, { latitude: 32.06, longitude: 118.79 }))?.id);
+    }
+    expect(picks.size).toBeGreaterThan(8);
+    expect([...picks].every((id) => id?.startsWith('cn-community-near-'))).toBe(true);
+  });
+
   it('keeps coordinate matching separate from alias random windows', async () => {
     const bind = vi.fn((..._values: unknown[]) => ({ all: async () => ({ results: [] }) }));
     const prepare = vi.fn((_sql: string) => ({ bind }));
