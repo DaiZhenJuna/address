@@ -379,17 +379,19 @@ export const runPostcodeInference = async ({
         const postcode = result && isValidPostcode(country, result.postcode) ? result.postcode : '';
         if (postcode) {
           const { components, addresses } = withPostcode(row, postcode, country);
-          await transaction.prepare(`UPDATE address_pool SET postcode=?,postcode_key=?,component_variants_json=?,address_variants_json=?,
-              active=1,retired_at=NULL WHERE id=? AND postcode=''`).bind(postcode, postcodeKey(postcode), components, addresses, row.id).run();
+          const changed = (await transaction.prepare(`UPDATE address_pool SET postcode=?,postcode_key=?,component_variants_json=?,address_variants_json=?,
+              active=1,retired_at=NULL WHERE id=? AND postcode='' RETURNING id`).bind(postcode, postcodeKey(postcode), components, addresses, row.id).all()).results;
+          if (!changed.length) continue;
           updated.push(row.id);
           if (Number(row.active) !== 1) summary.restored += 1;
           summary[{ boundary: 'boundary', 'catalog-unique': 'catalog', 'township-consensus': 'township', 'official-township': 'official',
             'address-register': 'register' }[result.method] || 'neighbor'] += 1;
         }
+        // A row deleted since it was read (a duplicate merged by a concurrent repair) is skipped, not a failed page.
         await transaction.prepare(`INSERT INTO address_postcode_inference(address_id,postcode,method,source,checked_revision,updated_at)
-          VALUES (?,?,?,?,?,?) ON CONFLICT(address_id) DO UPDATE SET postcode=excluded.postcode,method=excluded.method,
+          SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM address_pool WHERE id=?) ON CONFLICT(address_id) DO UPDATE SET postcode=excluded.postcode,method=excluded.method,
             source=excluded.source,checked_revision=excluded.checked_revision,updated_at=excluded.updated_at`)
-          .bind(row.id, postcode, postcode ? result.method : '', postcode ? result.source : '', revision, updatedAt).run();
+          .bind(row.id, postcode, postcode ? result.method : '', postcode ? result.source : '', revision, updatedAt, row.id).run();
       }
     });
     if (updated.length) await refreshAddressGenerationIndex(database, country, { addressIds: updated });

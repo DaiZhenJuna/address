@@ -78,4 +78,26 @@ describe('imports without a required postcode', () => {
       await database.close();
     }
   });
+
+  it('skip rows deleted while their postcodes were looked up', async () => {
+    const directory = resolve('.data-cache', 'postcode-pending-tests', randomUUID());
+    directories.push(directory);
+    await mkdir(directory, { recursive: true });
+    const database = openTestDatabase(':memory:');
+    try {
+      await importRows(database, directory, 'v1', [{}, {}]);
+      const ids = (await database.prepare('SELECT id FROM address_pool ORDER BY house_number').all()).results.map((row) => row.id);
+      const summary = await runPostcodeInference({
+        database, countryCode: 'US', addressIds: ids,
+        boundaryLookup: async () => {
+          await database.prepare('DELETE FROM address_pool WHERE id=?').bind(ids[1]).run();
+          return new Map(ids.map((id) => [id, '19103']));
+        }
+      });
+      expect(summary.filledIds).toEqual([ids[0]]);
+      expect(await database.prepare('SELECT COUNT(*) AS total FROM address_postcode_inference').first('total')).toBe(1);
+    } finally {
+      await database.close();
+    }
+  });
 });
